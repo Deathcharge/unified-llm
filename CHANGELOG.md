@@ -16,9 +16,10 @@ All notable changes to this project will be documented here. The project follows
 
 ### Removed
 
-- Private `helix-unified` imports, Redis cache coupling, BYOT/account logic, hard-coded model catalogs, and Helix service URLs from the standalone package.
+- Legacy private-monorepo imports, Redis cache coupling, BYOT/account logic, hard-coded model catalogs, and private service URLs from the standalone package.
 
 ### Changed
 
 - Reset the unpublished package maturity from unsupported `1.0.0` metadata to honest alpha `0.1.0`.
 - Convenience methods now raise typed errors instead of returning empty strings.
+- Updated ownership, maintainer, support, security-reporting, and licensing-contact identity to Samsarix LLC.

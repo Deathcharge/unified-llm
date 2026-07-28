@@ -12,6 +12,8 @@ At baseline, the local package could be installed in editable mode but could not
 
 The release-candidate branch is now a standalone package with a deliberately small public API, an OpenAI-compatible HTTP adapter, bounded routing behavior, deterministic tests, distributable artifacts, CI, and honest operational documentation. The remaining release gates require owner action: resolve the contradictory license notices and authorize a live endpoint check and publication workflow.
 
+Samsarix LLC is the confirmed owner and maintainer identity. General inquiries use `contact@samsarix.com`; product and security-channel requests use `support@samsarix.com`. The Git remote remains `https://github.com/Deathcharge/unified-llm.git`, so published repository and issue URLs continue to use that verified location until an actual hosting migration occurs.
+
 ## Chosen product definition
 
 `unified-llm` will be a small, typed, asynchronous Python SDK for routing text/chat requests across an ordered set of OpenAI-compatible endpoints or user-supplied provider adapters.
@@ -141,6 +143,7 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 - Verified Ruff lint and formatting, strict mypy checks, source and wheel builds, Twine metadata, editable installation, built-wheel import, and the offline fallback example.
 - Audited the fully resolved runtime dependency set with `pip-audit`; no known vulnerabilities were reported for that set. The unpublished local package itself was intentionally excluded from the dependency-only audit.
 - Completed an adversarial repository-wide security review. Three candidates covering request resource exhaustion, CI action pinning, and configured-endpoint SSRF were tested and suppressed or found not applicable; no reportable security finding remains.
+- Updated the package ownership, maintainer, support, vulnerability-reporting, and licensing-contact identity to Samsarix LLC while preserving the verified code-hosting URL.
 
 ## Release-candidate verification
 
@@ -167,7 +170,7 @@ The engineering disposition is **release candidate with named external gates**, 
 
 ## Owner-, credential-, legal-, or production-blocked tasks
 
-- The repository contains a one-line `LICENSE` claiming Apache 2.0 and a separate proprietary notice. The owner must choose and install a complete, legally reviewed license before public release. Engineering must not infer or replace it.
+- Samsarix LLC is the confirmed owner, but the repository still contains a one-line `LICENSE` claiming Apache 2.0 and a separate Samsarix LLC proprietary notice. Samsarix LLC must choose and install a complete, legally reviewed license before public release. Engineering must not infer or replace it.
 - Live provider validation requires an owner-supplied endpoint, model, API key, and authorization to incur usage. Automated tests will use deterministic mocks instead.
 - Publishing to PyPI, creating signing identities, configuring trusted publishing, and creating a GitHub release require owner authorization.
 

@@ -4,6 +4,8 @@
 
 It is for application developers who want an in-process reliability boundary—validated inputs, normalized responses, timeouts, bounded retries, fallback, cancellation, and concurrency control—without deploying a gateway. It is not a hosted service or a broad provider-translation framework.
 
+Maintained by **Samsarix LLC**.
+
 > **Maturity: alpha (`0.1.0`).** The core route and failure behavior is implemented and tested without paid APIs. Live-provider validation and public release are gated as described in [Release status](#release-status).
 
 ## What it does
@@ -175,7 +177,7 @@ Provider.complete protocol
 normalized UnifiedLLMResponse or typed exception
 ```
 
-The built-in `OpenAICompatibleProvider` owns HTTP translation. `UnifiedLLM` owns policy and never reads private Helix services. Custom providers implement one async `complete` method. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
+The built-in `OpenAICompatibleProvider` owns HTTP translation. `UnifiedLLM` owns policy and has no dependency on legacy private services. Custom providers implement one async `complete` method. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
 
 ## Security, privacy, reliability, and cost
 
@@ -187,6 +189,15 @@ The built-in `OpenAICompatibleProvider` owns HTTP translation. `UnifiedLLM` owns
 - Custom adapters must sanitize their own `ProviderError` values and honor the supplied timeout.
 
 Report vulnerabilities using [SECURITY.md](SECURITY.md).
+
+## Support and contact
+
+- Usage and product support: `support@samsarix.com`
+- General and commercial inquiries: `contact@samsarix.com`
+- Bugs and feature requests that are safe to discuss publicly: the [repository issue tracker](https://github.com/Deathcharge/unified-llm/issues)
+- Vulnerabilities: follow [SECURITY.md](SECURITY.md), not the public issue tracker
+
+See [SUPPORT.md](SUPPORT.md) for the information to include and the prerelease support boundary. Never send API keys, authorization headers, prompts, provider responses, or customer data in an issue or initial email.
 
 ## Limitations
 
@@ -213,4 +224,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Changes to retry classification, provide
 
 ## License status
 
-The repository currently contains a one-line `LICENSE` that names Apache 2.0 and a separate proprietary notice. That is not a clear, complete grant. The owner must resolve the licensing model before redistribution or public release; this README does not select or reinterpret a license.
+Copyright (c) 2024-2026 Samsarix LLC.
+
+The repository currently contains a one-line `LICENSE` that names Apache 2.0 and a separate proprietary notice owned by Samsarix LLC. That is not a clear, complete grant. Samsarix LLC must resolve the licensing model before redistribution or public release; this README does not select or reinterpret a license.

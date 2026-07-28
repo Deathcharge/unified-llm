@@ -6,9 +6,11 @@ No public release is currently supported. Security fixes target the latest repos
 
 ## Reporting a vulnerability
 
-Use the repository's private GitHub vulnerability-reporting flow when available. If it is unavailable, open a minimal issue asking the maintainer for a private reporting channel; do not include exploit details, credentials, prompt content, provider responses, or customer data in a public issue.
+Use the repository's private GitHub vulnerability-reporting flow when available. If it is unavailable, email `support@samsarix.com` with `[SECURITY]` in the subject and a minimal, non-sensitive summary requesting a private reporting channel. Do not include exploit details, credentials, prompt content, provider responses, or customer data in a public issue or initial email.
 
 Include the affected version or commit, the smallest reproduction, impact, preconditions, and whether a provider account was charged. Use synthetic data and revoke any credential that may have been exposed.
+
+Samsarix LLC does not publish a response-time or remediation-time service-level agreement for this prerelease package. Receipt and next steps will be communicated through the private channel.
 
 ## Security model
 

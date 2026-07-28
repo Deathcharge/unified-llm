@@ -12,6 +12,8 @@ Activate the virtual environment, then install development tools:
 python -m pip install -e ".[dev]"
 ```
 
+For setup or usage help that is not a code change, see [SUPPORT.md](SUPPORT.md) or email `support@samsarix.com`.
+
 ## Required checks
 
 ```bash
@@ -35,4 +37,4 @@ Tests must not contact live APIs or require credentials. Use a custom fake provi
 
 ## Pull requests
 
-Describe the user problem, behavior change, tests added, compatibility impact, and security/cost implications. The current licensing ambiguity is an owner decision; do not replace or reinterpret license files in an ordinary contribution.
+Describe the user problem, behavior change, tests added, compatibility impact, and security/cost implications. The current licensing ambiguity is a Samsarix LLC decision; do not replace or reinterpret license files in an ordinary contribution.
