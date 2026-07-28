@@ -1,10 +1,38 @@
-"""
-Unified LLM Bridge
+"""Public package API for the unified-llm routing SDK."""
 
-Multi-model LLM orchestration and intelligent routing.
-"""
+from .unified_llm import (
+    Attempt,
+    ConfigurationError,
+    FallbackExhausted,
+    Message,
+    OpenAICompatibleProvider,
+    Provider,
+    ProviderError,
+    RequestValidationError,
+    Route,
+    ToolDefinition,
+    UnifiedLLM,
+    UnifiedLLMError,
+    UnifiedLLMResponse,
+    UnifiedLLMService,
+)
 
-from .unified_llm import UnifiedLLM
+__version__ = "0.1.0"
 
-__version__ = "1.0.0"
-__all__ = ["UnifiedLLM"]
+__all__ = [
+    "Attempt",
+    "ConfigurationError",
+    "FallbackExhausted",
+    "Message",
+    "OpenAICompatibleProvider",
+    "Provider",
+    "ProviderError",
+    "RequestValidationError",
+    "Route",
+    "ToolDefinition",
+    "UnifiedLLM",
+    "UnifiedLLMError",
+    "UnifiedLLMResponse",
+    "UnifiedLLMService",
+    "__version__",
+]

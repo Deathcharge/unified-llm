@@ -1,3 +1,9 @@
-include README.md
+include CHANGELOG.md
+include CONTRIBUTING.md
 include LICENSE
 include LICENSE.PROPRIETARY
+include README.md
+include SECURITY.md
+recursive-include docs *.md
+recursive-include examples *.py
+recursive-include tests *.py
