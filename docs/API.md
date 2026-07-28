@@ -35,6 +35,7 @@ UnifiedLLM(
     max_total_attempts=4,
     max_concurrency=10,
     max_input_chars=200_000,
+    max_request_bytes=1_000_000,
     max_output_tokens=32_768,
     backoff_base=0.25,
     max_retry_delay=5.0,

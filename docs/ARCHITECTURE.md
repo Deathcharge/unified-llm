@@ -51,7 +51,7 @@ application data and configuration (trusted host)
 
 ## Resource and cost bounds
 
-Defaults are 30 seconds per attempt, two attempts per route, four attempts total, ten concurrent logical requests, 200,000 input characters, 32,768 output tokens, and a five-second maximum retry delay. Constructor validation sets absolute safety ceilings.
+Defaults are 30 seconds per attempt, two attempts per route, four attempts total, ten concurrent logical requests, 200,000 message-content characters, 1,000,000 serialized request bytes, 32,768 output tokens, and a five-second maximum retry delay. Constructor validation sets absolute safety ceilings.
 
 Retries are not perfectly idempotent: a provider can finish generation while the response is lost. The bounded attempt count limits amplification; applications with stricter budgets should use one attempt per route and lower token limits.
 

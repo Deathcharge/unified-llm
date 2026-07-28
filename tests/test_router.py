@@ -247,6 +247,7 @@ def test_response_derives_total_tokens() -> None:
         {"max_total_attempts": 0},
         {"max_concurrency": 0},
         {"max_input_chars": 0},
+        {"max_request_bytes": 0},
         {"max_output_tokens": 0},
         {"backoff_base": -1},
         {"retry_jitter": 2},
@@ -368,6 +369,21 @@ async def test_non_mapping_messages_and_tools_are_rejected() -> None:
             [{"role": "user", "content": "Hi"}],
             tools=["not-a-tool"],  # type: ignore[list-item]
         )
+
+
+async def test_full_serialized_request_is_bounded_and_validated() -> None:
+    provider = ScriptedProvider("primary", [response()])
+    client = UnifiedLLM([Route(provider, "model")], max_request_bytes=100)
+    with pytest.raises(RequestValidationError, match="byte request limit"):
+        await client.chat_with_metadata(
+            [{"role": "user", "content": "Hi", "metadata": "x" * 100}],
+            tools=[{"type": "function", "function": {"name": "demo"}}],
+        )
+    with pytest.raises(RequestValidationError, match="JSON serializable"):
+        await client.chat_with_metadata(
+            [{"role": "user", "content": "Hi", "metadata": object()}],
+        )
+    assert provider.calls == []
 
 
 async def test_provider_without_close_is_supported() -> None:

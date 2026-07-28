@@ -250,7 +250,7 @@ class OpenAICompatibleProvider:
             payload["tools"] = list(tools)
         try:
             json.dumps(payload)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
 
         headers = {"Accept": "application/json", "Content-Type": "application/json", **self._headers}
@@ -367,6 +367,7 @@ class UnifiedLLM:
         max_total_attempts: int = 4,
         max_concurrency: int = 10,
         max_input_chars: int = 200_000,
+        max_request_bytes: int = 1_000_000,
         max_output_tokens: int = 32_768,
         backoff_base: float = 0.25,
         max_retry_delay: float = 5.0,
@@ -391,6 +392,8 @@ class UnifiedLLM:
             raise ConfigurationError("max_concurrency must be between 1 and 1000.")
         if not 1 <= max_input_chars <= 10_000_000:
             raise ConfigurationError("max_input_chars must be between 1 and 10000000.")
+        if not 1 <= max_request_bytes <= 20_000_000:
+            raise ConfigurationError("max_request_bytes must be between 1 and 20000000.")
         if not 1 <= max_output_tokens <= 1_000_000:
             raise ConfigurationError("max_output_tokens must be between 1 and 1000000.")
         if backoff_base < 0 or max_retry_delay < 0:
@@ -402,6 +405,7 @@ class UnifiedLLM:
         self.max_attempts_per_route = max_attempts_per_route
         self.max_total_attempts = max_total_attempts
         self.max_input_chars = max_input_chars
+        self.max_request_bytes = max_request_bytes
         self.max_output_tokens = max_output_tokens
         self.backoff_base = float(backoff_base)
         self.max_retry_delay = float(max_retry_delay)
@@ -750,6 +754,18 @@ class UnifiedLLM:
             )
         if tools is not None and not all(isinstance(tool, Mapping) for tool in tools):
             raise RequestValidationError("Every tool definition must be a mapping.")
+        try:
+            serialized = json.dumps(
+                {"messages": normalized, "tools": list(tools) if tools is not None else None},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        except (TypeError, ValueError, RecursionError) as exc:
+            raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
+        if len(serialized) > self.max_request_bytes:
+            raise RequestValidationError(
+                f"Serialized messages and tools exceed the configured {self.max_request_bytes}-byte request limit."
+            )
         return tuple(normalized)
 
     def _select_routes(self, *, provider: str | None, model: str | None) -> tuple[tuple[Route, str], ...]:

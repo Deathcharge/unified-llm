@@ -10,6 +10,7 @@ All notable changes to this project will be documented here. The project follows
 - OpenAI Chat Completions-compatible HTTP adapter.
 - Normalized response, usage, tool-call, and attempt metadata.
 - Bounded transient retries, ordered fallback, concurrency, timeouts, and request sizes.
+- Full serialized-request limits covering tool schemas and extra message fields.
 - Typed configuration, validation, provider, and exhaustion errors.
 - Environment configuration, deterministic examples, tests, CI, and release documentation.
 

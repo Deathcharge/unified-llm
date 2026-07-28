@@ -11,7 +11,7 @@ It is for application developers who want an in-process reliability boundary—v
 - Routes async chat or prompt requests through explicit provider/model pairs.
 - Retries only transient transport, timeout, rate-limit, and selected server failures.
 - Falls back in declared order under a strict total-attempt budget.
-- Bounds request time, concurrency, input characters, output tokens, retry count, and retry delay.
+- Bounds request time, concurrency, input characters, serialized request bytes, output tokens, retry count, and retry delay.
 - Normalizes content, model, provider, usage, finish reason, tool calls, and sanitized attempt metadata.
 - Includes an OpenAI Chat Completions-compatible HTTP adapter and a small protocol for custom adapters.
 - Never logs or includes API keys, headers, prompt bodies, or response bodies in its own errors.
