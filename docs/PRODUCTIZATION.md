@@ -2,13 +2,15 @@
 
 Last updated: 2026-07-28
 
-This is the living record for turning this repository into an independently useful product. It distinguishes observed behavior from intended behavior and is updated as implementation and verification progress.
+This is the living record for turning this repository into an independently useful product. It distinguishes the audited baseline from the verified release-candidate state.
 
 ## Current repository assessment
 
 The local branch began as three commits that extracted one 1,395-line Python module from `helix-unified`, added a minimal `setup.py`, and added placeholder documentation. The worktree was clean at audit start. Local `main` was three commits ahead of and three commits behind `origin/main`, but the histories have no merge base. The remote branch is a separate 15,645-line monorepo extraction with no root packaging manifest, committed Python bytecode, broad unverified examples, and a README that claims production readiness. It is not a safe upstream to merge.
 
-The local package can be installed in editable mode, but it cannot be imported through its advertised public API. Most provider initialization depends on private `apps.backend.*` modules from another repository, so the extracted package cannot make an LLM request on its own. Documentation, packaging metadata, tests, CI, dependency declarations, and release guidance are absent or misleading.
+At baseline, the local package could be installed in editable mode but could not be imported through its advertised public API. Most provider initialization depended on private `apps.backend.*` modules from another repository, so the extracted package could not make an LLM request on its own. Documentation, packaging metadata, tests, CI, dependency declarations, and release guidance were absent or misleading.
+
+The release-candidate branch is now a standalone package with a deliberately small public API, an OpenAI-compatible HTTP adapter, bounded routing behavior, deterministic tests, distributable artifacts, CI, and honest operational documentation. The remaining release gates require owner action: resolve the contradictory license notices and authorize a live endpoint check and publication workflow.
 
 ## Chosen product definition
 
@@ -76,23 +78,23 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 
 ### P0
 
-- [ ] The documented top-level import fails because `UnifiedLLM` does not exist.
-- [ ] Standalone provider discovery never creates usable providers without private `apps.backend.*` modules from `helix-unified`.
-- [ ] Runtime dependencies (`aiohttp`, provider SDKs, Pydantic, Redis integration) are undeclared and inconsistently optional.
-- [ ] There are no tests for the public package or primary request journey.
-- [ ] Packaging metadata is insufficient for an honest distributable package.
+- [x] The documented top-level import failed because `UnifiedLLM` did not exist. The public class and compatibility alias now import from both editable and built-wheel installs.
+- [x] Standalone provider discovery depended on private `apps.backend.*` modules. Those dependencies were removed in favor of a public provider protocol and built-in HTTP adapter.
+- [x] Runtime dependencies were undeclared and inconsistently optional. The only runtime dependency is now an explicit bounded `httpx` range.
+- [x] There were no tests for the public package or primary request journey. The deterministic suite now covers configuration, routing, HTTP behavior, limits, lifecycle, and failure semantics without live provider calls.
+- [x] Packaging metadata was insufficient for an honest distributable package. Modern metadata, typed-package markers, source/wheel builds, and metadata checks are now present.
 
 ### P1
 
-- [ ] Retries and fallback catch essentially every exception, including permanent request/authentication failures, which can duplicate cost and hide configuration errors.
-- [ ] Retry, fallback, concurrency, input size, and total request budgets are not bounded coherently.
-- [ ] A Redis response-cache key omits provider and user identity while BYOT provider selection is supported, creating privacy and isolation risk.
-- [ ] Environment-provided Helix service URLs can receive a shared internal secret; this private-infrastructure coupling does not belong in a standalone package.
-- [ ] Provider and model selection relies on stale hard-coded model catalogs and model-name substring inference.
-- [ ] Errors are converted to empty strings in convenience methods, making operational recovery ambiguous.
-- [ ] Documentation contains nonexistent classes, methods, examples, directories, performance claims, and installation assumptions.
-- [ ] The code uses Python 3.10 union syntax while packaging claims Python 3.9 support.
-- [ ] There is no CI, changelog, security guidance, or installed-wheel verification.
+- [x] Retries and fallback caught essentially every exception. Retries are now limited to documented transient network/status failures, while permanent errors stop immediately.
+- [x] Retry, fallback, concurrency, input size, serialized request size, output tokens, timeout, and attempt budgets are now explicit and bounded.
+- [x] The cross-provider Redis response cache was removed from the standalone core, eliminating its tenant/provider key ambiguity and implicit retention behavior.
+- [x] Private Helix URLs and shared-secret forwarding were removed.
+- [x] Stale model catalogs and substring inference were replaced by explicit ordered routes.
+- [x] Empty-string failure results were replaced by typed exceptions with attempt metadata and secret-safe messages.
+- [x] Documentation was rewritten against the implemented public API and makes compatibility and release limitations explicit.
+- [x] Packaging now requires Python 3.10 or newer, matching the syntax and CI matrix.
+- [x] CI, changelog, contribution and security guidance, package builds, metadata checks, and installed-wheel smoke testing were added.
 
 ### P2
 
@@ -103,16 +105,16 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 
 ## Implementation checklist
 
-- [ ] Replace private Helix imports with a standalone provider protocol and HTTP adapter.
-- [ ] Implement validated routes, normalized responses, typed errors, bounded retry/fallback, timeouts, cancellation, and concurrency.
-- [ ] Add environment onboarding without implicit `.env` loading.
-- [ ] Add deterministic unit and HTTP-contract tests.
-- [ ] Add package-import and built-distribution verification.
-- [ ] Add modern packaging, lint, typing, test, build, and CI configuration.
-- [ ] Add credential-free examples and a real endpoint example.
-- [ ] Rewrite README and focused API, architecture, and quick-start docs.
-- [ ] Add changelog, contribution, and security guidance.
-- [ ] Perform a repository-wide security scan and adversarial final review.
+- [x] Replace private Helix imports with a standalone provider protocol and HTTP adapter.
+- [x] Implement validated routes, normalized responses, typed errors, bounded retry/fallback, timeouts, cancellation, and concurrency.
+- [x] Add environment onboarding without implicit `.env` loading.
+- [x] Add deterministic unit and HTTP-contract tests.
+- [x] Add package-import and built-distribution verification.
+- [x] Add modern packaging, lint, typing, test, build, and CI configuration.
+- [x] Add credential-free examples and a real endpoint example.
+- [x] Rewrite README and focused API, architecture, and quick-start docs.
+- [x] Add changelog, contribution, and security guidance.
+- [x] Perform a repository-wide security scan and adversarial final review.
 
 ## Release acceptance criteria
 
@@ -132,7 +134,31 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 - Audited local and remote histories and rejected an unsafe unrelated-history merge.
 - Recorded baseline command outcomes.
 - Performed bounded ecosystem research using current official OpenAI API, LiteLLM, OpenRouter, and Python Packaging documentation.
-- Chosen the standalone SDK product boundary and primary journey.
+- Chose the standalone SDK product boundary and primary journey.
+- Rebuilt the package around explicit routes, a public provider protocol, and a conservative OpenAI-compatible transport.
+- Added validation before provider I/O, including full serialized-request byte limits, and bounded all retry, timeout, token, attempt, and concurrency behavior.
+- Added 84 network-free tests with 98.16% statement coverage.
+- Verified Ruff lint and formatting, strict mypy checks, source and wheel builds, Twine metadata, editable installation, built-wheel import, and the offline fallback example.
+- Audited the fully resolved runtime dependency set with `pip-audit`; no known vulnerabilities were reported for that set. The unpublished local package itself was intentionally excluded from the dependency-only audit.
+- Completed an adversarial repository-wide security review. Three candidates covering request resource exhaustion, CI action pinning, and configured-endpoint SSRF were tested and suppressed or found not applicable; no reportable security finding remains.
+
+## Release-candidate verification
+
+Executed with Python 3.11.9 on 2026-07-28:
+
+| Command or check | Result |
+| --- | --- |
+| `python -m ruff check .` | Passed. |
+| `python -m ruff format --check .` | Passed. |
+| `python -m mypy unified_llm tests examples` | Passed. |
+| `python -m pytest -q --cov=unified_llm --cov-report=term-missing` | Passed: 84 tests, 98.16% coverage. |
+| `python examples/offline_fallback.py` | Passed: deterministic fallback from `primary` to `backup`. |
+| `python -m build` | Passed: source distribution and wheel. |
+| `python -m twine check dist/*` | Passed for both artifacts. |
+| Clean virtual-environment wheel install and import | Passed: `0.1.0 UnifiedLLM`. |
+| Resolved runtime dependency audit | Passed: no known vulnerabilities found. |
+
+The engineering disposition is **release candidate with named external gates**, not production-ready. Local acceptance criteria are met; public release is blocked on the owner-controlled license, live-provider, and publication steps below.
 
 ## Deferred work and rationale
 
