@@ -112,8 +112,7 @@ class MyProvider:
         temperature: float,
         timeout: float,
         tools: Sequence[ToolDefinition] | None = None,
-    ) -> UnifiedLLMResponse:
-        ...
+    ) -> UnifiedLLMResponse: ...
 ```
 
 Adapters must honor the timeout, propagate `asyncio.CancelledError`, sanitize `ProviderError`, avoid logging sensitive values, and mark only failures that are safe to repeat as retryable. An optional sync or async `aclose()` is called by the router lifecycle.
