@@ -10,7 +10,7 @@ The local branch began as three commits that extracted one 1,395-line Python mod
 
 At baseline, the local package could be installed in editable mode but could not be imported through its advertised public API. Most provider initialization depended on private `apps.backend.*` modules from another repository, so the extracted package could not make an LLM request on its own. Documentation, packaging metadata, tests, CI, dependency declarations, and release guidance were absent or misleading.
 
-The release-candidate branch is now a standalone package with a deliberately small public API, an OpenAI-compatible HTTP adapter, bounded routing behavior, deterministic tests, distributable artifacts, CI, and honest operational documentation. The remaining release gates require owner action: resolve the contradictory license notices and authorize a live endpoint check and publication workflow.
+The release-candidate branch is now a standalone Apache-2.0 package with a deliberately small public API, an OpenAI-compatible HTTP adapter, bounded routing behavior, deterministic tests, distributable artifacts, CI, and honest operational documentation. The remaining release gates require owner action: authorize a live endpoint check and the publication workflow.
 
 Samsarix LLC is the confirmed owner and maintainer identity. General inquiries use `contact@samsarix.com`; product and security-channel requests use `support@samsarix.com`. The Git remote remains `https://github.com/Deathcharge/unified-llm.git`, so published repository and issue URLs continue to use that verified location until an actual hosting migration occurs.
 
@@ -144,6 +144,7 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 - Audited the fully resolved runtime dependency set with `pip-audit`; no known vulnerabilities were reported for that set. The unpublished local package itself was intentionally excluded from the dependency-only audit.
 - Completed an adversarial repository-wide security review. Three candidates covering request resource exhaustion, CI action pinning, and configured-endpoint SSRF were tested and suppressed or found not applicable; no reportable security finding remains.
 - Updated the package ownership, maintainer, support, vulnerability-reporting, and licensing-contact identity to Samsarix LLC while preserving the verified code-hosting URL.
+- Selected Apache License 2.0 for the public SDK and replaced the contradictory incomplete license files with the complete standard license text and SPDX package metadata.
 
 ## Release-candidate verification
 
@@ -161,7 +162,7 @@ Executed with Python 3.11.9 on 2026-07-28:
 | Clean virtual-environment wheel install and import | Passed: `0.1.0 UnifiedLLM`. |
 | Resolved runtime dependency audit | Passed: no known vulnerabilities found. |
 
-The engineering disposition is **release candidate with named external gates**, not production-ready. Local acceptance criteria are met; public release is blocked on the owner-controlled license, live-provider, and publication steps below.
+The engineering disposition is **release candidate with named external gates**, not production-ready. Local acceptance criteria are met; package publication remains blocked on the owner-controlled live-provider and publication steps below.
 
 ## Deferred work and rationale
 
@@ -170,7 +171,6 @@ The engineering disposition is **release candidate with named external gates**, 
 
 ## Owner-, credential-, legal-, or production-blocked tasks
 
-- Samsarix LLC is the confirmed owner, but the repository still contains a one-line `LICENSE` claiming Apache 2.0 and a separate Samsarix LLC proprietary notice. Samsarix LLC must choose and install a complete, legally reviewed license before public release. Engineering must not infer or replace it.
 - Live provider validation requires an owner-supplied endpoint, model, API key, and authorization to incur usage. Automated tests will use deterministic mocks instead.
 - Publishing to PyPI, creating signing identities, configuring trusted publishing, and creating a GitHub release require owner authorization.
 
@@ -182,4 +182,4 @@ The engineering disposition is **release candidate with named external gates**, 
 
 ## Distribution and sustainability model
 
-The simplest distribution is a source and wheel package published to PyPI after the license gate, with Git tags and a changelog. The package should remain a focused open developer component if the owner selects an open-source license. If commercial sustainability is desired, support, integration work, or a separately operated gateway can be sold without weakening or bloating the core library. No paid tier or revenue claim is justified by current evidence.
+The simplest distribution is an Apache-2.0 source and wheel package published to PyPI after owner-authorized release setup, with Git tags and a changelog. The package should remain a focused open developer component. If commercial sustainability is desired, support, integration work, or a separately operated gateway can be sold without weakening or bloating the core library. No paid tier or revenue claim is justified by current evidence.

@@ -1,7 +1,6 @@
 include CHANGELOG.md
 include CONTRIBUTING.md
 include LICENSE
-include LICENSE.PROPRIETARY
 include README.md
 include SECURITY.md
 include SUPPORT.md

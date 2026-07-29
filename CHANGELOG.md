@@ -23,3 +23,4 @@ All notable changes to this project will be documented here. The project follows
 - Reset the unpublished package maturity from unsupported `1.0.0` metadata to honest alpha `0.1.0`.
 - Convenience methods now raise typed errors instead of returning empty strings.
 - Updated ownership, maintainer, support, security-reporting, and licensing-contact identity to Samsarix LLC.
+- Replaced contradictory incomplete license notices with a complete Apache License 2.0 grant.

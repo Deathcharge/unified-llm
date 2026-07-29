@@ -14,7 +14,8 @@ authors = [
 maintainers = [
   { name = "Samsarix LLC", email = "support@samsarix.com" },
 ]
-license-files = ["LICENSE", "LICENSE.PROPRIETARY"]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
   "httpx>=0.27,<1",
 ]

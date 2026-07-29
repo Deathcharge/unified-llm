@@ -37,4 +37,4 @@ Tests must not contact live APIs or require credentials. Use a custom fake provi
 
 ## Pull requests
 
-Describe the user problem, behavior change, tests added, compatibility impact, and security/cost implications. The current licensing ambiguity is a Samsarix LLC decision; do not replace or reinterpret license files in an ordinary contribution.
+Describe the user problem, behavior change, tests added, compatibility impact, and security/cost implications. Unless explicitly stated otherwise, contributions intentionally submitted for inclusion are provided under the Apache License 2.0, consistent with section 5 of the license. Do not submit code you do not have the right to contribute.

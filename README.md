@@ -210,9 +210,8 @@ See [SUPPORT.md](SUPPORT.md) for the information to include and the prerelease s
 
 The repository is a coherent release candidate for local evaluation. Public package publication remains blocked on:
 
-1. owner resolution of the conflicting/incomplete license files;
-2. owner-authorized live endpoint smoke tests;
-3. owner authorization and configuration for PyPI trusted publishing/signing.
+1. owner-authorized live endpoint smoke tests;
+2. owner authorization and configuration for PyPI trusted publishing/signing.
 
 The package name was not present on PyPI when checked on 2026-07-28; re-check immediately before publishing. No package has been published or production infrastructure changed by this work.
 
@@ -222,8 +221,8 @@ See [docs/PRODUCTIZATION.md](docs/PRODUCTIZATION.md) for the evidence, remaining
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Changes to retry classification, provider protocol fields, or public exceptions are API changes and require tests plus changelog entries.
 
-## License status
+## License
 
 Copyright (c) 2024-2026 Samsarix LLC.
 
-The repository currently contains a one-line `LICENSE` that names Apache 2.0 and a separate proprietary notice owned by Samsarix LLC. That is not a clear, complete grant. Samsarix LLC must resolve the licensing model before redistribution or public release; this README does not select or reinterpret a license.
+Licensed under the [Apache License 2.0](LICENSE). It permits commercial use, modification, and redistribution subject to its terms. The license does not grant rights to Samsarix LLC trademarks.
