@@ -22,6 +22,10 @@ The built-in adapter posts the conservative text/tool request subset to `<base_u
 
 HTTPS is required except for loopback hosts. Trusted private HTTP must be opted into explicitly. Credentials in URLs, query strings, fragments, authorization-header overrides, and header control characters are rejected.
 
+### `OpenAIResponsesProvider`
+
+The Responses adapter shares the same bounded HTTP transport and error classification. It sends `/responses` requests with `store=false` by default and translates Chat-style function definitions plus explicit assistant-call/tool-result continuation pairs. It returns text, refusal, and function-call outputs through the same normalized response type. Provider-specific payload builders let the router measure the exact outbound body for both built-in APIs.
+
 ### `UnifiedLLM`
 
 The router validates the exact provider payload before network I/O, including the resolved model and generation fields, then holds one concurrency permit for the logical request. It validates and bounds normalized results from built-in and custom adapters before returning them. Each route receives at most `max_attempts_per_route`; the request receives at most `max_total_attempts`. Retry delay uses bounded exponential backoff, optional jitter, and a capped `Retry-After` value.

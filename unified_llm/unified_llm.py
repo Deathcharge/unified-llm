@@ -248,6 +248,69 @@ class OpenAICompatibleProvider:
         timeout: float,
         tools: Sequence[ToolDefinition] | None = None,
     ) -> UnifiedLLMResponse:
+        payload = self._build_payload(
+            messages=messages,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            tools=tools,
+        )
+        data = await self._post_json("/chat/completions", payload, timeout)
+
+        try:
+            choices = data["choices"]
+            choice = choices[0]
+            message = choice["message"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ProviderError(
+                self.name,
+                f"Provider {self.name!r} returned a malformed completion response.",
+                retryable=False,
+            ) from exc
+        if not isinstance(data, Mapping) or not isinstance(choice, Mapping) or not isinstance(message, Mapping):
+            raise ProviderError(
+                self.name,
+                f"Provider {self.name!r} returned a malformed completion response.",
+                retryable=False,
+            )
+
+        raw_content = message.get("content")
+        content = self._normalize_content(raw_content)
+        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
+        if not content and not tool_calls:
+            raise ProviderError(
+                self.name,
+                f"Provider {self.name!r} returned neither content nor tool calls.",
+                retryable=False,
+            )
+
+        response_model = data.get("model")
+        finish_reason = choice.get("finish_reason")
+        usage = data.get("usage")
+        return UnifiedLLMResponse(
+            content=content,
+            model=response_model if isinstance(response_model, str) and response_model else model,
+            provider=self.name,
+            usage={
+                str(key): value
+                for key, value in usage.items()
+                if isinstance(usage, Mapping) and isinstance(value, int) and not isinstance(value, bool)
+            }
+            if isinstance(usage, Mapping)
+            else {},
+            finish_reason=finish_reason if isinstance(finish_reason, str) and finish_reason else "stop",
+            tool_calls=tool_calls,
+        )
+
+    def _build_payload(
+        self,
+        *,
+        messages: Sequence[Message],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Sequence[ToolDefinition] | None,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "messages": list(messages),
             "model": model,
@@ -256,6 +319,9 @@ class OpenAICompatibleProvider:
         }
         if tools:
             payload["tools"] = list(tools)
+        return payload
+
+    async def _post_json(self, path: str, payload: Mapping[str, Any], timeout: float) -> Any:
         try:
             json.dumps(payload, allow_nan=False)
         except (TypeError, ValueError, RecursionError) as exc:
@@ -271,7 +337,7 @@ class OpenAICompatibleProvider:
         try:
             request = self._client.build_request(
                 "POST",
-                f"{self.base_url}/chat/completions",
+                f"{self.base_url}{path}",
                 json=payload,
                 headers=headers,
                 timeout=timeout,
@@ -307,44 +373,13 @@ class OpenAICompatibleProvider:
             raise ProviderError(self.name, f"Provider {self.name!r} response failed.", retryable=True) from exc
 
         try:
-            data = json.loads(response_body)
-            choices = data["choices"]
-            choice = choices[0]
-            message = choice["message"]
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            return json.loads(response_body)
+        except (ValueError, TypeError) as exc:
             raise ProviderError(
                 self.name,
-                f"Provider {self.name!r} returned a malformed completion response.",
+                f"Provider {self.name!r} returned malformed JSON.",
                 retryable=False,
             ) from exc
-
-        raw_content = message.get("content")
-        content = self._normalize_content(raw_content)
-        tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
-        if not content and not tool_calls:
-            raise ProviderError(
-                self.name,
-                f"Provider {self.name!r} returned neither content nor tool calls.",
-                retryable=False,
-            )
-
-        response_model = data.get("model")
-        finish_reason = choice.get("finish_reason")
-        usage = data.get("usage")
-        return UnifiedLLMResponse(
-            content=content,
-            model=response_model if isinstance(response_model, str) and response_model else model,
-            provider=self.name,
-            usage={
-                str(key): value
-                for key, value in usage.items()
-                if isinstance(usage, Mapping) and isinstance(value, int) and not isinstance(value, bool)
-            }
-            if isinstance(usage, Mapping)
-            else {},
-            finish_reason=finish_reason if isinstance(finish_reason, str) and finish_reason else "stop",
-            tool_calls=tool_calls,
-        )
 
     async def _read_bounded_response(self, response: httpx.Response) -> bytes:
         content_length = response.headers.get("Content-Length")
@@ -402,6 +437,200 @@ class OpenAICompatibleProvider:
         if self._client is not None and self._owns_client:
             await self._client.aclose()
             self._client = None
+
+
+class OpenAIResponsesProvider(OpenAICompatibleProvider):
+    """Bounded adapter for OpenAI's stateless Responses API subset.
+
+    Requests default to ``store=False`` so application state and retention stay
+    under host control. Text, refusals, and function calls are normalized into
+    the package's existing response contract.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        base_url: str = "https://api.openai.com/v1",
+        api_key: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        allow_insecure_http: bool = False,
+        max_response_bytes: int = 2_000_000,
+        store: bool = False,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        if not isinstance(store, bool):
+            raise ConfigurationError("store must be a boolean.")
+        super().__init__(
+            name=name,
+            base_url=base_url,
+            api_key=api_key,
+            headers=headers,
+            allow_insecure_http=allow_insecure_http,
+            max_response_bytes=max_response_bytes,
+            client=client,
+        )
+        self.store = store
+
+    def _build_payload(
+        self,
+        *,
+        messages: Sequence[Message],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Sequence[ToolDefinition] | None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "input": [item for message in messages for item in self._translate_input(message)],
+            "max_output_tokens": max_tokens,
+            "temperature": temperature,
+            "store": self.store,
+        }
+        if tools:
+            payload["tools"] = [self._translate_tool(tool) for tool in tools]
+        return payload
+
+    async def complete(
+        self,
+        *,
+        messages: Sequence[Message],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        timeout: float,
+        tools: Sequence[ToolDefinition] | None = None,
+    ) -> UnifiedLLMResponse:
+        payload = self._build_payload(
+            messages=messages,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            tools=tools,
+        )
+        data = await self._post_json("/responses", payload, timeout)
+        if not isinstance(data, Mapping) or not isinstance(data.get("output"), list):
+            raise ProviderError(
+                self.name,
+                f"Provider {self.name!r} returned a malformed Responses API response.",
+                retryable=False,
+            )
+
+        content_parts: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
+        for item in data["output"]:
+            if not isinstance(item, Mapping):
+                continue
+            if item.get("type") == "message" and isinstance(item.get("content"), list):
+                for part in item["content"]:
+                    if not isinstance(part, Mapping):
+                        continue
+                    text = part.get("text") if part.get("type") == "output_text" else part.get("refusal")
+                    if isinstance(text, str):
+                        content_parts.append(text)
+            elif item.get("type") == "function_call":
+                name = item.get("name")
+                arguments = item.get("arguments")
+                call_id = item.get("call_id")
+                if (
+                    not isinstance(name, str)
+                    or not name
+                    or not isinstance(arguments, str)
+                    or not isinstance(call_id, str)
+                    or not call_id
+                ):
+                    raise ProviderError(
+                        self.name,
+                        f"Provider {self.name!r} returned a malformed function call.",
+                        retryable=False,
+                    )
+                tool_calls.append(
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {"name": name, "arguments": arguments},
+                    }
+                )
+
+        content = "".join(content_parts)
+        if not content and not tool_calls:
+            raise ProviderError(
+                self.name,
+                f"Provider {self.name!r} returned neither content nor tool calls.",
+                retryable=False,
+            )
+        usage = data.get("usage")
+        response_model = data.get("model")
+        status = data.get("status")
+        return UnifiedLLMResponse(
+            content=content,
+            model=response_model if isinstance(response_model, str) and response_model else model,
+            provider=self.name,
+            usage={
+                str(key): value
+                for key, value in usage.items()
+                if isinstance(usage, Mapping) and isinstance(value, int) and not isinstance(value, bool)
+            }
+            if isinstance(usage, Mapping)
+            else {},
+            finish_reason=(
+                "tool_calls"
+                if tool_calls
+                else "stop"
+                if status == "completed"
+                else status
+                if isinstance(status, str) and status
+                else "stop"
+            ),
+            tool_calls=tuple(tool_calls),
+        )
+
+    @staticmethod
+    def _translate_input(message: Message) -> list[dict[str, Any]]:
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            translated: list[dict[str, Any]] = []
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                translated.append({"role": "assistant", "content": content})
+            tool_calls = message["tool_calls"]
+            if not isinstance(tool_calls, list):
+                raise RequestValidationError("Assistant tool_calls must be a list.")
+            for call in tool_calls:
+                function = call.get("function") if isinstance(call, Mapping) else None
+                call_id = call.get("id") if isinstance(call, Mapping) else None
+                name = function.get("name") if isinstance(function, Mapping) else None
+                arguments = function.get("arguments") if isinstance(function, Mapping) else None
+                if (
+                    not isinstance(call_id, str)
+                    or not call_id
+                    or not isinstance(name, str)
+                    or not name
+                    or not isinstance(arguments, str)
+                ):
+                    raise RequestValidationError("Assistant tool calls require an id, function name, and arguments.")
+                translated.append({"type": "function_call", "call_id": call_id, "name": name, "arguments": arguments})
+            return translated
+        if message.get("role") != "tool":
+            return [dict(message)]
+        call_id = message.get("tool_call_id")
+        if not isinstance(call_id, str) or not call_id:
+            raise RequestValidationError("Responses API tool messages require a non-empty tool_call_id.")
+        return [{"type": "function_call_output", "call_id": call_id, "output": message["content"]}]
+
+    @staticmethod
+    def _translate_tool(tool: ToolDefinition) -> dict[str, Any]:
+        function = tool.get("function")
+        if tool.get("type") != "function" or not isinstance(function, Mapping):
+            raise RequestValidationError("Responses API tools must use the OpenAI function-tool shape.")
+        name = function.get("name")
+        if not isinstance(name, str) or not name:
+            raise RequestValidationError("Responses API function tools require a non-empty name.")
+        translated: dict[str, Any] = {"type": "function", "name": name}
+        for key in ("description", "parameters", "strict"):
+            if key in function:
+                translated[key] = function[key]
+        return translated
 
 
 Sleep: TypeAlias = Callable[[float], Awaitable[None]]
@@ -818,9 +1047,17 @@ class UnifiedLLM:
                 raise RequestValidationError(
                     f"messages[{index}].role must be one of: {', '.join(sorted(_ALLOWED_ROLES))}."
                 )
-            if not isinstance(content, str) or not content:
+            assistant_tool_calls = message.get("tool_calls")
+            has_assistant_tool_calls = (
+                role == "assistant"
+                and isinstance(assistant_tool_calls, list)
+                and bool(assistant_tool_calls)
+                and all(isinstance(call, Mapping) for call in assistant_tool_calls)
+            )
+            if (not isinstance(content, str) or not content) and not has_assistant_tool_calls:
                 raise RequestValidationError(f"messages[{index}].content must be a non-empty string.")
-            total_chars += len(content)
+            if isinstance(content, str):
+                total_chars += len(content)
             normalized.append(dict(message))
         if total_chars > self.max_input_chars:
             raise RequestValidationError(
@@ -831,18 +1068,19 @@ class UnifiedLLM:
         try:
             serialized_requests = [
                 json.dumps(
-                    {
-                        "messages": normalized,
-                        "model": resolved_model,
-                        "max_tokens": max_tokens,
-                        "temperature": temperature,
-                        **({"tools": list(tools)} if tools else {}),
-                    },
+                    self._request_payload(
+                        route.provider,
+                        normalized,
+                        resolved_model,
+                        max_tokens,
+                        temperature,
+                        tools,
+                    ),
                     ensure_ascii=False,
                     allow_nan=False,
                     separators=(",", ":"),
                 ).encode("utf-8")
-                for _, resolved_model in selected
+                for route, resolved_model in selected
             ]
         except (TypeError, ValueError, RecursionError) as exc:
             raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
@@ -851,6 +1089,31 @@ class UnifiedLLM:
                 f"Serialized provider request exceeds the configured {self.max_request_bytes}-byte request limit."
             )
         return tuple(normalized)
+
+    @staticmethod
+    def _request_payload(
+        provider: Provider,
+        messages: Sequence[Message],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Sequence[ToolDefinition] | None,
+    ) -> Mapping[str, Any]:
+        if isinstance(provider, OpenAICompatibleProvider):
+            return provider._build_payload(
+                messages=messages,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                tools=tools,
+            )
+        return {
+            "messages": list(messages),
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            **({"tools": list(tools)} if tools else {}),
+        }
 
     def _validate_response(self, response: object, provider: str) -> UnifiedLLMResponse:
         if not isinstance(response, UnifiedLLMResponse):
@@ -987,6 +1250,7 @@ __all__ = [
     "FallbackExhausted",
     "Message",
     "OpenAICompatibleProvider",
+    "OpenAIResponsesProvider",
     "Provider",
     "ProviderError",
     "RequestValidationError",

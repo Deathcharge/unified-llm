@@ -177,7 +177,9 @@ Provider.complete protocol
 normalized UnifiedLLMResponse or typed exception
 ```
 
-The built-in `OpenAICompatibleProvider` owns HTTP translation. `UnifiedLLM` owns policy and has no dependency on legacy private services. Custom providers implement one async `complete` method. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
+The built-in HTTP providers own API translation. `UnifiedLLM` owns policy and has no dependency on legacy private services. Custom providers implement one async `complete` method. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
+
+For new OpenAI integrations, use `OpenAIResponsesProvider`. It targets `/responses`, keeps server-side storage disabled by default, and participates in the same retry, fallback, request-size, and response-size boundaries. See [examples/responses_api.py](examples/responses_api.py).
 
 ## Security, privacy, reliability, and cost
 
@@ -203,7 +205,7 @@ See [SUPPORT.md](SUPPORT.md) for the information to include and the prerelease s
 ## Limitations
 
 - The built-in adapter targets the conservative text/tool subset of `/chat/completions`; provider extensions and multimodal input are not normalized.
-- Native Anthropic Messages, Google GenAI, OpenAI Responses, embeddings, images, audio, and true token streaming are not included in `0.1.0`.
+- Native Anthropic Messages, Google GenAI, embeddings, images, audio, stateful Responses conversations, built-in hosted tools, and true token streaming are not included in `0.1.0`.
 - Fallback happens only for transient failures. Authentication, invalid request, and malformed response failures stop immediately.
 - Endpoint conformance is verified with deterministic mocks. Live provider compatibility depends on credentials and is an external release gate.
 

@@ -182,6 +182,7 @@ async def test_retry_after_parsing(retry_after: str | None, expected: str | None
         {},
         {"choices": []},
         {"choices": [{}]},
+        {"choices": [{"message": "invalid"}]},
         {"choices": [{"message": {"content": None}}]},
     ],
 )

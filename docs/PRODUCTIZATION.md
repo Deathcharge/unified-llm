@@ -166,7 +166,7 @@ The engineering disposition is **release candidate with named external gates**, 
 
 ## Deferred work and rationale
 
-- Provider-specific APIs, streaming, telemetry, and pricing are P2 extensions. Adding them now would broaden the public contract before the core route/failure semantics are proven.
+- Streaming, telemetry, and pricing remain P2 extensions. The OpenAI Responses adapter was added only after the core route/failure and resource-bound semantics were proven, and it reuses those contracts rather than creating a parallel router.
 - A hosted proxy, UI, authentication, persistence, and billing are out of scope because they duplicate mature products and are unsupported by repository evidence.
 
 ## Owner-, credential-, legal-, or production-blocked tasks
