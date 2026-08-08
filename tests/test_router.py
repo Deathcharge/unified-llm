@@ -386,6 +386,42 @@ async def test_full_serialized_request_is_bounded_and_validated() -> None:
     assert provider.calls == []
 
 
+async def test_request_limit_accounts_for_model_and_generation_fields() -> None:
+    provider = ScriptedProvider("primary", [response()])
+    client = UnifiedLLM([Route(provider, "m" * 100)], max_request_bytes=100)
+    with pytest.raises(RequestValidationError, match="provider request"):
+        await client.chat([{"role": "user", "content": "Hi"}], max_tokens=1, temperature=0)
+    assert provider.calls == []
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        "not-a-response",
+        UnifiedLLMResponse(content="ok", model="m", provider="p", usage={"total_tokens": -1}),
+        UnifiedLLMResponse(content="ok", model="m", provider="p", tool_calls=({"id": "1"}, {"id": "2"})),
+    ],
+)
+async def test_custom_adapter_responses_are_validated(outcome: object) -> None:
+    provider = ScriptedProvider("primary", [outcome])  # type: ignore[list-item]
+    client = UnifiedLLM([Route(provider, "model")], max_tool_calls=1)
+    with pytest.raises(ProviderError, match="Provider 'primary' failed") as caught:
+        await client.chat_with_metadata([{"role": "user", "content": "Hi"}])
+    assert len(caught.value.attempts) == 1
+
+
+async def test_normalized_custom_adapter_response_is_bounded() -> None:
+    provider = ScriptedProvider("primary", [response("x" * 101)])
+    client = UnifiedLLM(
+        [Route(provider, "model")],
+        max_response_chars=100,
+        max_response_bytes=200,
+    )
+    with pytest.raises(ProviderError, match="Provider 'primary' failed") as caught:
+        await client.chat_with_metadata([{"role": "user", "content": "Hi"}])
+    assert len(caught.value.attempts) == 1
+
+
 async def test_provider_without_close_is_supported() -> None:
     class NoCloseProvider:
         name = "no-close"

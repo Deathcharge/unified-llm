@@ -18,13 +18,13 @@ The host can implement provider-specific authentication, translation, or test fa
 
 ### `OpenAICompatibleProvider`
 
-The built-in adapter posts the conservative text/tool request subset to `<base_url>/chat/completions` and normalizes the first choice. It classifies only HTTP 408, 429, 500, 502, 503, and 504 plus transport/timeouts as retryable. Remote error bodies are not copied into package exceptions.
+The built-in adapter posts the conservative text/tool request subset to `<base_url>/chat/completions` and normalizes the first choice. It rejects oversized success bodies while reading the response stream, before JSON decoding. It classifies only HTTP 408, 429, 500, 502, 503, and 504 plus transport/timeouts as retryable. Remote error bodies are not copied into package exceptions.
 
 HTTPS is required except for loopback hosts. Trusted private HTTP must be opted into explicitly. Credentials in URLs, query strings, fragments, authorization-header overrides, and header control characters are rejected.
 
 ### `UnifiedLLM`
 
-The router validates input before network I/O, then holds one concurrency permit for the logical request. Each route receives at most `max_attempts_per_route`; the request receives at most `max_total_attempts`. Retry delay uses bounded exponential backoff, optional jitter, and a capped `Retry-After` value.
+The router validates the exact provider payload before network I/O, including the resolved model and generation fields, then holds one concurrency permit for the logical request. It validates and bounds normalized results from built-in and custom adapters before returning them. Each route receives at most `max_attempts_per_route`; the request receives at most `max_total_attempts`. Retry delay uses bounded exponential backoff, optional jitter, and a capped `Retry-After` value.
 
 Permanent provider failures stop immediately. Transient failures can retry and move to the next route. Cancellation propagates immediately. Unexpected custom-adapter exceptions are wrapped without copying their text.
 
@@ -51,7 +51,7 @@ application data and configuration (trusted host)
 
 ## Resource and cost bounds
 
-Defaults are 30 seconds per attempt, two attempts per route, four attempts total, ten concurrent logical requests, 200,000 message-content characters, 1,000,000 serialized request bytes, 32,768 output tokens, and a five-second maximum retry delay. Constructor validation sets absolute safety ceilings.
+Defaults are 30 seconds per attempt, two attempts per route, four attempts total, ten concurrent logical requests, 200,000 message-content characters, 1,000,000 exact serialized request bytes, 2,000,000 normalized response bytes, 1,000,000 response characters, 128 tool calls, 32,768 output tokens, and a five-second maximum retry delay. The built-in HTTP adapter also caps raw success bodies at 2,000,000 bytes. Constructor validation sets absolute safety ceilings.
 
 Retries are not perfectly idempotent: a provider can finish generation while the response is lost. The bounded attempt count limits amplification; applications with stricter budgets should use one attempt per route and lower token limits.
 

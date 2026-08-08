@@ -185,8 +185,9 @@ The built-in `OpenAICompatibleProvider` owns HTTP translation. `UnifiedLLM` owns
 - Prompt and response content crosses the configured provider boundary. Review that provider's retention and training policy before sending sensitive data.
 - The core performs no caching, persistence, telemetry, or prompt/response logging.
 - Automatic retry can duplicate provider work if a response is lost after generation. Keep attempt and token limits conservative for your workload.
+- Exact outbound payloads and normalized inbound responses are byte-bounded. The built-in HTTP adapter also caps raw success bodies before JSON decoding.
 - The SDK reports token usage when the endpoint supplies it but does not estimate money. Operating cost is the sum over attempts of provider-reported input/output tokens multiplied by that provider/model's current rates.
-- Custom adapters must sanitize their own `ProviderError` values and honor the supplied timeout.
+- Custom adapters must sanitize their own `ProviderError` values and honor the supplied timeout; their normalized results are validated and bounded by the router.
 
 Report vulnerabilities using [SECURITY.md](SECURITY.md).
 

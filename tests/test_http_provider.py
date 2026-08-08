@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
+from typing import Any
 
 import httpx
 import pytest
@@ -235,8 +236,12 @@ async def test_internally_created_client_is_owned(monkeypatch: pytest.MonkeyPatc
         def __init__(self) -> None:
             self.closed = False
 
-        async def post(self, *_args: object, **_kwargs: object) -> httpx.Response:
-            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+        def build_request(self, method: str, url: str, **kwargs: Any) -> httpx.Request:
+            kwargs.pop("timeout", None)
+            return httpx.Request(method, url, **kwargs)
+
+        async def send(self, request: httpx.Request, **_kwargs: object) -> httpx.Response:
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]}, request=request)
 
         async def aclose(self) -> None:
             self.closed = True
@@ -253,6 +258,26 @@ async def test_internally_created_client_is_owned(monkeypatch: pytest.MonkeyPatc
     )
     await provider.aclose()
     assert fake.closed
+
+
+@pytest.mark.parametrize("use_content_length", [True, False])
+async def test_response_body_limit_is_enforced(use_content_length: bool) -> None:
+    body = json.dumps({"choices": [{"message": {"content": "x" * 200}}]}).encode()
+    headers = {"Content-Length": str(len(body))} if use_content_length else {}
+    http_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=body, headers=headers))
+    )
+    provider = OpenAICompatibleProvider(name="mock", client=http_client, max_response_bytes=100)
+    with pytest.raises(ProviderError, match="byte limit") as caught:
+        await provider.complete(
+            messages=[{"role": "user", "content": "Hi"}],
+            model="m",
+            max_tokens=1,
+            temperature=0,
+            timeout=1,
+        )
+    assert not caught.value.retryable
+    await http_client.aclose()
 
 
 @pytest.mark.parametrize(
@@ -274,6 +299,8 @@ def test_invalid_port_and_empty_provider_name_are_rejected() -> None:
         OpenAICompatibleProvider(name="test", base_url="https://example.com:not-a-port/v1")
     with pytest.raises(ConfigurationError, match="name"):
         OpenAICompatibleProvider(name=" ")
+    with pytest.raises(ConfigurationError, match="max_response_bytes"):
+        OpenAICompatibleProvider(name="test", max_response_bytes=0)
 
 
 def test_local_http_and_explicit_private_http_are_supported() -> None:
