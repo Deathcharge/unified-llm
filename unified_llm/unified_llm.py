@@ -875,9 +875,8 @@ class UnifiedLLM:
                 provider, f"Provider adapter {provider!r} returned a non-serializable response."
             ) from exc
         if len(serialized) > self.max_response_bytes:
-            raise ProviderError(
-                provider, f"Provider adapter {provider!r} response exceeded the configured byte limit."
-            )
+            message = f"Provider adapter {provider!r} response exceeded the configured byte limit."
+            raise ProviderError(provider, message)
         return response
 
     def _select_routes(self, *, provider: str | None, model: str | None) -> tuple[tuple[Route, str], ...]:
