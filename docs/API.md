@@ -37,7 +37,7 @@ OpenAIResponsesProvider(
 )
 ```
 
-Creates an adapter for `<base_url>/responses`. It defaults to stateless `store=False`, translates Chat-style function tools and tool-result messages, and normalizes text, refusals, and function calls into `UnifiedLLMResponse`. Set `store=True` only when the configured endpoint's retention behavior is intentional.
+Creates an adapter for `<base_url>/responses`. It defaults to stateless `store=False`, translates Chat-style function tools, assistant tool-call turns, and following tool-result messages, and normalizes text, refusals, and function calls into `UnifiedLLMResponse`. A continuation must include the original assistant `tool_calls` entry immediately before its matching `role="tool"` message. Set `store=True` only when the configured endpoint's retention behavior is intentional.
 
 ### `Route(provider, model)`
 

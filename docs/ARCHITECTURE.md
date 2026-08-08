@@ -24,7 +24,7 @@ HTTPS is required except for loopback hosts. Trusted private HTTP must be opted 
 
 ### `OpenAIResponsesProvider`
 
-The Responses adapter shares the same bounded HTTP transport and error classification. It sends `/responses` requests with `store=false` by default, translates the package's Chat-style function contract at the provider boundary, and returns the same normalized response type. Provider-specific payload builders let the router measure the exact outbound body for both built-in APIs.
+The Responses adapter shares the same bounded HTTP transport and error classification. It sends `/responses` requests with `store=false` by default and translates Chat-style function definitions plus explicit assistant-call/tool-result continuation pairs. It returns text, refusal, and function-call outputs through the same normalized response type. Provider-specific payload builders let the router measure the exact outbound body for both built-in APIs.
 
 ### `UnifiedLLM`
 

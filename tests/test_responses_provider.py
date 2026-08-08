@@ -128,6 +128,53 @@ async def test_responses_tool_output_and_store_opt_in_are_translated() -> None:
     await http_client.aclose()
 
 
+async def test_router_replays_function_call_before_tool_output() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed",
+                "output": [{"type": "message", "content": [{"type": "output_text", "text": "Done"}]}],
+            },
+        )
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OpenAIResponsesProvider(name="openai", client=http_client)
+    client = UnifiedLLM([Route(provider, "gpt-test")])
+    result = await client.chat_with_metadata(
+        [
+            {"role": "user", "content": "Weather?"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "get_weather", "arguments": '{"city":"Boston"}'},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call-1", "content": "72 F"},
+        ]
+    )
+    assert seen["input"] == [
+        {"role": "user", "content": "Weather?"},
+        {
+            "type": "function_call",
+            "call_id": "call-1",
+            "name": "get_weather",
+            "arguments": '{"city":"Boston"}',
+        },
+        {"type": "function_call_output", "call_id": "call-1", "output": "72 F"},
+    ]
+    assert result.content == "Done"
+    await client.aclose()
+
+
 async def test_responses_refusal_is_returned_as_content() -> None:
     payload = {
         "status": "completed",
@@ -160,6 +207,21 @@ async def test_malformed_or_empty_responses_output_is_rejected(payload: dict[str
     http_client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=payload)))
     provider = OpenAIResponsesProvider(name="openai", client=http_client)
     with pytest.raises(ProviderError, match=r"malformed|neither"):
+        await provider.complete(
+            messages=[{"role": "user", "content": "Hi"}],
+            model="gpt-test",
+            max_tokens=10,
+            temperature=0,
+            timeout=5,
+        )
+    await http_client.aclose()
+
+
+async def test_response_function_call_requires_call_id() -> None:
+    payload = {"output": [{"type": "function_call", "id": "item-1", "name": "demo", "arguments": "{}"}]}
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=payload)))
+    provider = OpenAIResponsesProvider(name="openai", client=http_client)
+    with pytest.raises(ProviderError, match="malformed function call"):
         await provider.complete(
             messages=[{"role": "user", "content": "Hi"}],
             model="gpt-test",

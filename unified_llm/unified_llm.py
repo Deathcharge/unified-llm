@@ -483,7 +483,7 @@ class OpenAIResponsesProvider(OpenAICompatibleProvider):
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model,
-            "input": [self._translate_input(message) for message in messages],
+            "input": [item for message in messages for item in self._translate_input(message)],
             "max_output_tokens": max_tokens,
             "temperature": temperature,
             "store": self.store,
@@ -532,15 +532,26 @@ class OpenAIResponsesProvider(OpenAICompatibleProvider):
             elif item.get("type") == "function_call":
                 name = item.get("name")
                 arguments = item.get("arguments")
-                if isinstance(name, str) and isinstance(arguments, str):
-                    call_id = item.get("call_id", item.get("id", ""))
-                    tool_calls.append(
-                        {
-                            "id": call_id if isinstance(call_id, str) else "",
-                            "type": "function",
-                            "function": {"name": name, "arguments": arguments},
-                        }
+                call_id = item.get("call_id")
+                if (
+                    not isinstance(name, str)
+                    or not name
+                    or not isinstance(arguments, str)
+                    or not isinstance(call_id, str)
+                    or not call_id
+                ):
+                    raise ProviderError(
+                        self.name,
+                        f"Provider {self.name!r} returned a malformed function call.",
+                        retryable=False,
                     )
+                tool_calls.append(
+                    {
+                        "id": call_id,
+                        "type": "function",
+                        "function": {"name": name, "arguments": arguments},
+                    }
+                )
 
         content = "".join(content_parts)
         if not content and not tool_calls:
@@ -576,13 +587,36 @@ class OpenAIResponsesProvider(OpenAICompatibleProvider):
         )
 
     @staticmethod
-    def _translate_input(message: Message) -> dict[str, Any]:
+    def _translate_input(message: Message) -> list[dict[str, Any]]:
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            translated: list[dict[str, Any]] = []
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                translated.append({"role": "assistant", "content": content})
+            tool_calls = message["tool_calls"]
+            if not isinstance(tool_calls, list):
+                raise RequestValidationError("Assistant tool_calls must be a list.")
+            for call in tool_calls:
+                function = call.get("function") if isinstance(call, Mapping) else None
+                call_id = call.get("id") if isinstance(call, Mapping) else None
+                name = function.get("name") if isinstance(function, Mapping) else None
+                arguments = function.get("arguments") if isinstance(function, Mapping) else None
+                if (
+                    not isinstance(call_id, str)
+                    or not call_id
+                    or not isinstance(name, str)
+                    or not name
+                    or not isinstance(arguments, str)
+                ):
+                    raise RequestValidationError("Assistant tool calls require an id, function name, and arguments.")
+                translated.append({"type": "function_call", "call_id": call_id, "name": name, "arguments": arguments})
+            return translated
         if message.get("role") != "tool":
-            return dict(message)
+            return [dict(message)]
         call_id = message.get("tool_call_id")
         if not isinstance(call_id, str) or not call_id:
             raise RequestValidationError("Responses API tool messages require a non-empty tool_call_id.")
-        return {"type": "function_call_output", "call_id": call_id, "output": message["content"]}
+        return [{"type": "function_call_output", "call_id": call_id, "output": message["content"]}]
 
     @staticmethod
     def _translate_tool(tool: ToolDefinition) -> dict[str, Any]:
@@ -1013,9 +1047,17 @@ class UnifiedLLM:
                 raise RequestValidationError(
                     f"messages[{index}].role must be one of: {', '.join(sorted(_ALLOWED_ROLES))}."
                 )
-            if not isinstance(content, str) or not content:
+            assistant_tool_calls = message.get("tool_calls")
+            has_assistant_tool_calls = (
+                role == "assistant"
+                and isinstance(assistant_tool_calls, list)
+                and bool(assistant_tool_calls)
+                and all(isinstance(call, Mapping) for call in assistant_tool_calls)
+            )
+            if (not isinstance(content, str) or not content) and not has_assistant_tool_calls:
                 raise RequestValidationError(f"messages[{index}].content must be a non-empty string.")
-            total_chars += len(content)
+            if isinstance(content, str):
+                total_chars += len(content)
             normalized.append(dict(message))
         if total_chars > self.max_input_chars:
             raise RequestValidationError(
