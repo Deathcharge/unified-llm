@@ -21,6 +21,24 @@ OpenAICompatibleProvider(
 
 Creates an adapter for `<base_url>/chat/completions`. A supplied HTTP client remains caller-owned.
 
+### `OpenAIResponsesProvider(...)`
+
+```python
+OpenAIResponsesProvider(
+    *,
+    name: str,
+    base_url: str = "https://api.openai.com/v1",
+    api_key: str | None = None,
+    headers: Mapping[str, str] | None = None,
+    allow_insecure_http: bool = False,
+    max_response_bytes: int = 2_000_000,
+    store: bool = False,
+    client: httpx.AsyncClient | None = None,
+)
+```
+
+Creates an adapter for `<base_url>/responses`. It defaults to stateless `store=False`, translates Chat-style function tools and tool-result messages, and normalizes text, refusals, and function calls into `UnifiedLLMResponse`. Set `store=True` only when the configured endpoint's retention behavior is intentional.
+
 ### `Route(provider, model)`
 
 Pairs a provider with its exact default model ID. Provider names must be unique in one router.

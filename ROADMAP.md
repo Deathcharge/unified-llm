@@ -15,6 +15,7 @@ Current disposition: Already integrated; roadmap changes should use an ordinary 
 - Preserve the pre-productization default under a rollback ref before merging; do not delete legacy history.
 - The productization SHA is already the remote default and its hosted checks pass.
 - Completed in the next hardening increment: account for the exact outbound body, cap inbound response bytes and normalized structures, and validate custom adapters.
+- Completed in the following API increment: add a stateless-by-default OpenAI Responses adapter without weakening the shared bounds or fallback contract.
 - Next: prove one canonical consumer and a capped live endpoint before publication.
 - Review priority: prove one consumer, green wheel CI, one capped live endpoint, and trusted publication.
 
