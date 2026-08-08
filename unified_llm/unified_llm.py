@@ -219,6 +219,7 @@ class OpenAICompatibleProvider:
         api_key: str | None = None,
         headers: Mapping[str, str] | None = None,
         allow_insecure_http: bool = False,
+        max_response_bytes: int = 2_000_000,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         if not isinstance(name, str) or not name.strip():
@@ -227,6 +228,13 @@ class OpenAICompatibleProvider:
         self.base_url = _validate_base_url(base_url, allow_insecure_http=allow_insecure_http)
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._headers = _validate_headers(headers)
+        if (
+            isinstance(max_response_bytes, bool)
+            or not isinstance(max_response_bytes, int)
+            or not 1 <= max_response_bytes <= 20_000_000
+        ):
+            raise ConfigurationError("max_response_bytes must be between 1 and 20000000.")
+        self.max_response_bytes = max_response_bytes
         self._client = client
         self._owns_client = client is None
 
@@ -249,7 +257,7 @@ class OpenAICompatibleProvider:
         if tools:
             payload["tools"] = list(tools)
         try:
-            json.dumps(payload)
+            json.dumps(payload, allow_nan=False)
         except (TypeError, ValueError, RecursionError) as exc:
             raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
 
@@ -261,12 +269,14 @@ class OpenAICompatibleProvider:
             self._client = httpx.AsyncClient()
 
         try:
-            response = await self._client.post(
+            request = self._client.build_request(
+                "POST",
                 f"{self.base_url}/chat/completions",
                 json=payload,
                 headers=headers,
                 timeout=timeout,
             )
+            response = await self._client.send(request, stream=True)
         except httpx.TimeoutException as exc:
             raise ProviderError(self.name, f"Provider {self.name!r} timed out.", retryable=True) from exc
         except httpx.NetworkError as exc:
@@ -276,6 +286,7 @@ class OpenAICompatibleProvider:
 
         if not 200 <= response.status_code < 300:
             retryable = response.status_code in _RETRYABLE_STATUS_CODES
+            await response.aclose()
             raise ProviderError(
                 self.name,
                 f"Provider {self.name!r} returned HTTP {response.status_code}.",
@@ -285,7 +296,18 @@ class OpenAICompatibleProvider:
             )
 
         try:
-            data = response.json()
+            response_body = await self._read_bounded_response(response)
+        except ProviderError:
+            raise
+        except httpx.TimeoutException as exc:
+            raise ProviderError(self.name, f"Provider {self.name!r} timed out.", retryable=True) from exc
+        except httpx.NetworkError as exc:
+            raise ProviderError(self.name, f"Provider {self.name!r} was unreachable.", retryable=True) from exc
+        except httpx.HTTPError as exc:
+            raise ProviderError(self.name, f"Provider {self.name!r} response failed.", retryable=True) from exc
+
+        try:
+            data = json.loads(response_body)
             choices = data["choices"]
             choice = choices[0]
             message = choice["message"]
@@ -323,6 +345,36 @@ class OpenAICompatibleProvider:
             finish_reason=finish_reason if isinstance(finish_reason, str) and finish_reason else "stop",
             tool_calls=tool_calls,
         )
+
+    async def _read_bounded_response(self, response: httpx.Response) -> bytes:
+        content_length = response.headers.get("Content-Length")
+        try:
+            declared_length = int(content_length) if content_length is not None else None
+        except ValueError:
+            declared_length = None
+        if declared_length is not None and declared_length > self.max_response_bytes:
+            await response.aclose()
+            raise ProviderError(
+                self.name,
+                f"Provider {self.name!r} response exceeded the configured byte limit.",
+                retryable=False,
+            )
+
+        body = bytearray()
+        received = 0
+        try:
+            async for chunk in response.aiter_bytes():
+                received += len(chunk)
+                if received > self.max_response_bytes:
+                    raise ProviderError(
+                        self.name,
+                        f"Provider {self.name!r} response exceeded the configured byte limit.",
+                        retryable=False,
+                    )
+                body.extend(chunk)
+        finally:
+            await response.aclose()
+        return bytes(body)
 
     @staticmethod
     def _normalize_content(content: Any) -> str:
@@ -368,6 +420,9 @@ class UnifiedLLM:
         max_concurrency: int = 10,
         max_input_chars: int = 200_000,
         max_request_bytes: int = 1_000_000,
+        max_response_bytes: int = 2_000_000,
+        max_response_chars: int = 1_000_000,
+        max_tool_calls: int = 128,
         max_output_tokens: int = 32_768,
         backoff_base: float = 0.25,
         max_retry_delay: float = 5.0,
@@ -394,6 +449,20 @@ class UnifiedLLM:
             raise ConfigurationError("max_input_chars must be between 1 and 10000000.")
         if not 1 <= max_request_bytes <= 20_000_000:
             raise ConfigurationError("max_request_bytes must be between 1 and 20000000.")
+        if (
+            isinstance(max_response_bytes, bool)
+            or not isinstance(max_response_bytes, int)
+            or not 1 <= max_response_bytes <= 20_000_000
+        ):
+            raise ConfigurationError("max_response_bytes must be between 1 and 20000000.")
+        if (
+            isinstance(max_response_chars, bool)
+            or not isinstance(max_response_chars, int)
+            or not 1 <= max_response_chars <= 10_000_000
+        ):
+            raise ConfigurationError("max_response_chars must be between 1 and 10000000.")
+        if isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int) or not 0 <= max_tool_calls <= 10_000:
+            raise ConfigurationError("max_tool_calls must be between 0 and 10000.")
         if not 1 <= max_output_tokens <= 1_000_000:
             raise ConfigurationError("max_output_tokens must be between 1 and 1000000.")
         if backoff_base < 0 or max_retry_delay < 0:
@@ -406,6 +475,9 @@ class UnifiedLLM:
         self.max_total_attempts = max_total_attempts
         self.max_input_chars = max_input_chars
         self.max_request_bytes = max_request_bytes
+        self.max_response_bytes = max_response_bytes
+        self.max_response_chars = max_response_chars
+        self.max_tool_calls = max_tool_calls
         self.max_output_tokens = max_output_tokens
         self.backoff_base = float(backoff_base)
         self.max_retry_delay = float(max_retry_delay)
@@ -580,8 +652,8 @@ class UnifiedLLM:
     ) -> UnifiedLLMResponse:
         """Run the request through the selected bounded route set."""
 
-        normalized_messages = self._validate_request(messages, max_tokens, temperature, tools)
         selected = self._select_routes(provider=provider, model=model)
+        normalized_messages = self._validate_request(messages, selected, max_tokens, temperature, tools)
         attempts: list[Attempt] = []
         total_attempts = 0
 
@@ -604,6 +676,7 @@ class UnifiedLLM:
                             ),
                             timeout=self.request_timeout,
                         )
+                        response = self._validate_response(response, route.provider.name)
                     except asyncio.CancelledError:
                         raise
                     except asyncio.TimeoutError:
@@ -718,6 +791,7 @@ class UnifiedLLM:
     def _validate_request(
         self,
         messages: Sequence[Message],
+        selected: Sequence[tuple[Route, str]],
         max_tokens: int,
         temperature: float,
         tools: Sequence[ToolDefinition] | None,
@@ -755,18 +829,69 @@ class UnifiedLLM:
         if tools is not None and not all(isinstance(tool, Mapping) for tool in tools):
             raise RequestValidationError("Every tool definition must be a mapping.")
         try:
+            serialized_requests = [
+                json.dumps(
+                    {
+                        "messages": normalized,
+                        "model": resolved_model,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        **({"tools": list(tools)} if tools else {}),
+                    },
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                for _, resolved_model in selected
+            ]
+        except (TypeError, ValueError, RecursionError) as exc:
+            raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
+        if any(len(serialized) > self.max_request_bytes for serialized in serialized_requests):
+            raise RequestValidationError(
+                f"Serialized provider request exceeds the configured {self.max_request_bytes}-byte request limit."
+            )
+        return tuple(normalized)
+
+    def _validate_response(self, response: object, provider: str) -> UnifiedLLMResponse:
+        if not isinstance(response, UnifiedLLMResponse):
+            raise ProviderError(provider, f"Provider adapter {provider!r} returned an invalid response.")
+        if not isinstance(response.content, str) or len(response.content) > self.max_response_chars:
+            raise ProviderError(provider, f"Provider adapter {provider!r} returned an invalid or oversized response.")
+        if not isinstance(response.model, str) or not isinstance(response.provider, str):
+            raise ProviderError(provider, f"Provider adapter {provider!r} returned invalid response metadata.")
+        if not isinstance(response.usage, dict) or any(
+            not isinstance(key, str) or isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for key, value in response.usage.items()
+        ):
+            raise ProviderError(provider, f"Provider adapter {provider!r} returned invalid usage metadata.")
+        if not isinstance(response.finish_reason, str) or not isinstance(response.tool_calls, tuple):
+            raise ProviderError(provider, f"Provider adapter {provider!r} returned invalid response metadata.")
+        if len(response.tool_calls) > self.max_tool_calls or any(
+            not isinstance(call, dict) for call in response.tool_calls
+        ):
+            raise ProviderError(provider, f"Provider adapter {provider!r} returned invalid or excessive tool calls.")
+        try:
             serialized = json.dumps(
-                {"messages": normalized, "tools": list(tools) if tools is not None else None},
+                {
+                    "content": response.content,
+                    "model": response.model,
+                    "provider": response.provider,
+                    "usage": response.usage,
+                    "finish_reason": response.finish_reason,
+                    "tool_calls": response.tool_calls,
+                },
                 ensure_ascii=False,
+                allow_nan=False,
                 separators=(",", ":"),
             ).encode("utf-8")
         except (TypeError, ValueError, RecursionError) as exc:
-            raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
-        if len(serialized) > self.max_request_bytes:
-            raise RequestValidationError(
-                f"Serialized messages and tools exceed the configured {self.max_request_bytes}-byte request limit."
-            )
-        return tuple(normalized)
+            raise ProviderError(
+                provider, f"Provider adapter {provider!r} returned a non-serializable response."
+            ) from exc
+        if len(serialized) > self.max_response_bytes:
+            message = f"Provider adapter {provider!r} response exceeded the configured byte limit."
+            raise ProviderError(provider, message)
+        return response
 
     def _select_routes(self, *, provider: str | None, model: str | None) -> tuple[tuple[Route, str], ...]:
         if provider is not None:

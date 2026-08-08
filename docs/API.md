@@ -14,6 +14,7 @@ OpenAICompatibleProvider(
     api_key: str | None = None,
     headers: Mapping[str, str] | None = None,
     allow_insecure_http: bool = False,
+    max_response_bytes: int = 2_000_000,
     client: httpx.AsyncClient | None = None,
 )
 ```
@@ -36,6 +37,9 @@ UnifiedLLM(
     max_concurrency=10,
     max_input_chars=200_000,
     max_request_bytes=1_000_000,
+    max_response_bytes=2_000_000,
+    max_response_chars=1_000_000,
+    max_tool_calls=128,
     max_output_tokens=32_768,
     backoff_base=0.25,
     max_retry_delay=5.0,
@@ -116,3 +120,5 @@ class MyProvider:
 ```
 
 Adapters must honor the timeout, propagate `asyncio.CancelledError`, sanitize `ProviderError`, avoid logging sensitive values, and mark only failures that are safe to repeat as retryable. An optional sync or async `aclose()` is called by the router lifecycle.
+
+The router validates every adapter result before returning it. Responses must be `UnifiedLLMResponse` instances with serializable metadata, non-negative integer usage values, dictionary tool calls, and values within the configured response limits.

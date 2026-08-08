@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented here. The project follows semantic versioning after its first public release.
 
+## Unreleased
+
+### Added
+
+- Configurable raw and normalized response byte limits, response character limits, and tool-call count limits.
+- Runtime validation for normalized responses returned by every provider adapter.
+
+### Changed
+
+- Request byte accounting now measures each exact outbound provider body, including its resolved model and generation fields.
+- The built-in HTTP adapter now streams successful response bodies into a bounded buffer before JSON decoding.
+
 ## 0.1.0 - 2026-07-28
 
 ### Added

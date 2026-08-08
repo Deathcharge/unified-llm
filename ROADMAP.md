@@ -14,10 +14,8 @@ Current disposition: Already integrated; roadmap changes should use an ordinary 
 - Keep Samsarix LLC branding, package identity, license metadata, and compatibility aliases internally consistent.
 - Preserve the pre-productization default under a rollback ref before merging; do not delete legacy history.
 - The productization SHA is already the remote default and its hosted checks pass.
-- Next: account for the exact outbound body, cap inbound response bytes and normalized structures, validate custom adapters, and prove one canonical consumer.
-- Review priority: Measure the exact outbound body including model and generation fields.
-- Review priority: cap response bytes and normalized structures.
-- Review priority: validate custom-provider responses.
+- Completed in the next hardening increment: account for the exact outbound body, cap inbound response bytes and normalized structures, and validate custom adapters.
+- Next: prove one canonical consumer and a capped live endpoint before publication.
 - Review priority: prove one consumer, green wheel CI, one capped live endpoint, and trusted publication.
 
 ## Release candidate
