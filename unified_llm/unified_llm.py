@@ -228,7 +228,11 @@ class OpenAICompatibleProvider:
         self.base_url = _validate_base_url(base_url, allow_insecure_http=allow_insecure_http)
         self._api_key = api_key.strip() if api_key and api_key.strip() else None
         self._headers = _validate_headers(headers)
-        if not 1 <= max_response_bytes <= 20_000_000:
+        if (
+            isinstance(max_response_bytes, bool)
+            or not isinstance(max_response_bytes, int)
+            or not 1 <= max_response_bytes <= 20_000_000
+        ):
             raise ConfigurationError("max_response_bytes must be between 1 and 20000000.")
         self.max_response_bytes = max_response_bytes
         self._client = client
@@ -253,7 +257,7 @@ class OpenAICompatibleProvider:
         if tools:
             payload["tools"] = list(tools)
         try:
-            json.dumps(payload)
+            json.dumps(payload, allow_nan=False)
         except (TypeError, ValueError, RecursionError) as exc:
             raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
 
@@ -356,7 +360,7 @@ class OpenAICompatibleProvider:
                 retryable=False,
             )
 
-        chunks: list[bytes] = []
+        body = bytearray()
         received = 0
         try:
             async for chunk in response.aiter_bytes():
@@ -367,10 +371,10 @@ class OpenAICompatibleProvider:
                         f"Provider {self.name!r} response exceeded the configured byte limit.",
                         retryable=False,
                     )
-                chunks.append(chunk)
+                body.extend(chunk)
         finally:
             await response.aclose()
-        return b"".join(chunks)
+        return bytes(body)
 
     @staticmethod
     def _normalize_content(content: Any) -> str:
@@ -445,11 +449,19 @@ class UnifiedLLM:
             raise ConfigurationError("max_input_chars must be between 1 and 10000000.")
         if not 1 <= max_request_bytes <= 20_000_000:
             raise ConfigurationError("max_request_bytes must be between 1 and 20000000.")
-        if not 1 <= max_response_bytes <= 20_000_000:
+        if (
+            isinstance(max_response_bytes, bool)
+            or not isinstance(max_response_bytes, int)
+            or not 1 <= max_response_bytes <= 20_000_000
+        ):
             raise ConfigurationError("max_response_bytes must be between 1 and 20000000.")
-        if not 1 <= max_response_chars <= 10_000_000:
+        if (
+            isinstance(max_response_chars, bool)
+            or not isinstance(max_response_chars, int)
+            or not 1 <= max_response_chars <= 10_000_000
+        ):
             raise ConfigurationError("max_response_chars must be between 1 and 10000000.")
-        if not 0 <= max_tool_calls <= 10_000:
+        if isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int) or not 0 <= max_tool_calls <= 10_000:
             raise ConfigurationError("max_tool_calls must be between 0 and 10000.")
         if not 1 <= max_output_tokens <= 1_000_000:
             raise ConfigurationError("max_output_tokens must be between 1 and 1000000.")
@@ -827,6 +839,7 @@ class UnifiedLLM:
                         **({"tools": list(tools)} if tools else {}),
                     },
                     ensure_ascii=False,
+                    allow_nan=False,
                     separators=(",", ":"),
                 ).encode("utf-8")
                 for _, resolved_model in selected
@@ -868,6 +881,7 @@ class UnifiedLLM:
                     "tool_calls": response.tool_calls,
                 },
                 ensure_ascii=False,
+                allow_nan=False,
                 separators=(",", ":"),
             ).encode("utf-8")
         except (TypeError, ValueError, RecursionError) as exc:

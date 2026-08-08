@@ -200,11 +200,12 @@ async def test_malformed_success_response_is_rejected(payload: dict[str, object]
     await http_client.aclose()
 
 
-async def test_non_serializable_payload_is_rejected_before_network() -> None:
+@pytest.mark.parametrize("metadata", [object(), float("nan"), float("inf")])
+async def test_non_serializable_or_non_finite_payload_is_rejected_before_network(metadata: object) -> None:
     provider = OpenAICompatibleProvider(name="mock")
     with pytest.raises(RequestValidationError, match="JSON serializable"):
         await provider.complete(
-            messages=[{"role": "user", "content": object()}],
+            messages=[{"role": "user", "content": "Hi", "metadata": metadata}],
             model="m",
             max_tokens=1,
             temperature=0,

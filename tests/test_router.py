@@ -248,6 +248,9 @@ def test_response_derives_total_tokens() -> None:
         {"max_concurrency": 0},
         {"max_input_chars": 0},
         {"max_request_bytes": 0},
+        {"max_response_bytes": True},
+        {"max_response_chars": 1.5},
+        {"max_tool_calls": False},
         {"max_output_tokens": 0},
         {"backoff_base": -1},
         {"retry_jitter": 2},
@@ -383,6 +386,10 @@ async def test_full_serialized_request_is_bounded_and_validated() -> None:
         await client.chat_with_metadata(
             [{"role": "user", "content": "Hi", "metadata": object()}],
         )
+    with pytest.raises(RequestValidationError, match="JSON serializable"):
+        await client.chat_with_metadata(
+            [{"role": "user", "content": "Hi", "metadata": float("nan")}],
+        )
     assert provider.calls == []
 
 
@@ -411,11 +418,11 @@ async def test_custom_adapter_responses_are_validated(outcome: object) -> None:
 
 
 async def test_normalized_custom_adapter_response_is_bounded() -> None:
-    provider = ScriptedProvider("primary", [response("x" * 101)])
+    provider = ScriptedProvider("primary", [response("é" * 60)])
     client = UnifiedLLM(
         [Route(provider, "model")],
         max_response_chars=100,
-        max_response_bytes=200,
+        max_response_bytes=180,
     )
     with pytest.raises(ProviderError, match="Provider 'primary' failed") as caught:
         await client.chat_with_metadata([{"role": "user", "content": "Hi"}])
