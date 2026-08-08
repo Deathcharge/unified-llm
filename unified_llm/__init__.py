@@ -2,6 +2,7 @@
 
 from .unified_llm import (
     Attempt,
+    AttemptHook,
     ConfigurationError,
     FallbackExhausted,
     Message,
@@ -9,6 +10,7 @@ from .unified_llm import (
     OpenAIResponsesProvider,
     Provider,
     ProviderError,
+    ProviderHealth,
     RequestValidationError,
     Route,
     ToolDefinition,
@@ -22,6 +24,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "Attempt",
+    "AttemptHook",
     "ConfigurationError",
     "FallbackExhausted",
     "Message",
@@ -29,6 +32,7 @@ __all__ = [
     "OpenAIResponsesProvider",
     "Provider",
     "ProviderError",
+    "ProviderHealth",
     "RequestValidationError",
     "Route",
     "ToolDefinition",

@@ -116,7 +116,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Automatic routing uses every route in order. Passing `provider="backup"` selects one route and disables automatic fallback. A model override with multiple routes also requires an explicit provider, preventing accidental cross-provider model dispatch.
+Automatic routing starts in configured route order; routes in an active health cooldown move behind healthy routes. Passing `provider="backup"` selects one route, bypasses health reordering, and disables automatic fallback. A model override with multiple routes also requires an explicit provider, preventing accidental cross-provider model dispatch.
 
 ## Failure contract
 
@@ -128,6 +128,10 @@ The SDK raises instead of returning an ambiguous empty string:
 - `FallbackExhausted`: every eligible transient route failed within the attempt budget.
 
 `asyncio.CancelledError` is propagated immediately and is never retried. Each provider attempt is available as sanitized `Attempt` metadata on successful responses or failure exceptions.
+
+For metrics and tracing, pass `on_attempt=` a sync or async callback. It receives only the sanitized `Attempt` record—never messages, response content, credentials, headers, or endpoint URLs. Callback failures are isolated from generation; cancellation still propagates.
+
+After three consecutive transient failures by default, a provider enters a 30-second cooldown and is moved behind healthy routes. It remains a last-resort fallback, and an explicit `provider=` selection can probe it immediately. Successful probes reset its health. Inspect content-free state with `get_provider_health()`.
 
 ## Configuration
 
@@ -143,9 +147,11 @@ The SDK raises instead of returning an ambiguous empty string:
 | `UNIFIED_LLM_MAX_ATTEMPTS_PER_ROUTE` | No | `2` | Attempts per route, 1–5. |
 | `UNIFIED_LLM_MAX_TOTAL_ATTEMPTS` | No | `4` | Total request attempts, 1–16. |
 | `UNIFIED_LLM_MAX_CONCURRENCY` | No | `10` | In-flight requests, 1–1000. |
+| `UNIFIED_LLM_HEALTH_FAILURE_THRESHOLD` | No | `3` | Consecutive transient failures before route cooldown; `0` disables. |
+| `UNIFIED_LLM_HEALTH_COOLDOWN` | No | `30` | Seconds to deprioritize an unhealthy route, maximum 3600. |
 | `UNIFIED_LLM_ALLOW_INSECURE_HTTP` | No | `false` | Explicitly allow trusted remote plain HTTP. |
 
-See [.env.example](.env.example). Programmatic construction additionally controls input/output limits, retry delay, and custom non-auth headers.
+See [.env.example](.env.example). Programmatic construction additionally controls input/output limits, retry delay, the sanitized attempt hook, and custom non-auth headers.
 
 ## Development and verification
 

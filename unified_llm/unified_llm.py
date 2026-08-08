@@ -52,6 +52,25 @@ class Attempt:
     retryable: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderHealth:
+    """Content-free provider health snapshot maintained by the router."""
+
+    provider: str
+    consecutive_failures: int
+    cooling_down: bool
+    cooldown_remaining: float
+
+
+@dataclass(slots=True)
+class _ProviderHealthState:
+    consecutive_failures: int = 0
+    open_until: float = 0.0
+
+
+AttemptHook: TypeAlias = Callable[[Attempt], Awaitable[None] | None]
+
+
 class ProviderError(UnifiedLLMError):
     """A sanitized provider or transport failure.
 
@@ -634,6 +653,7 @@ class OpenAIResponsesProvider(OpenAICompatibleProvider):
 
 
 Sleep: TypeAlias = Callable[[float], Awaitable[None]]
+Clock: TypeAlias = Callable[[], float]
 
 
 class UnifiedLLM:
@@ -656,7 +676,11 @@ class UnifiedLLM:
         backoff_base: float = 0.25,
         max_retry_delay: float = 5.0,
         retry_jitter: float = 0.1,
+        health_failure_threshold: int = 3,
+        health_cooldown: float = 30.0,
+        on_attempt: AttemptHook | None = None,
         _sleep: Sleep = asyncio.sleep,
+        _clock: Clock = time.monotonic,
     ) -> None:
         self._routes = tuple(routes)
         if not self._routes:
@@ -698,6 +722,20 @@ class UnifiedLLM:
             raise ConfigurationError("Retry delays cannot be negative.")
         if not 0 <= retry_jitter <= 1:
             raise ConfigurationError("retry_jitter must be between 0 and 1.")
+        if (
+            isinstance(health_failure_threshold, bool)
+            or not isinstance(health_failure_threshold, int)
+            or not 0 <= health_failure_threshold <= 100
+        ):
+            raise ConfigurationError("health_failure_threshold must be between 0 and 100.")
+        if (
+            isinstance(health_cooldown, bool)
+            or not isinstance(health_cooldown, (int, float))
+            or not 0 <= health_cooldown <= 3_600
+        ):
+            raise ConfigurationError("health_cooldown must be between 0 and 3600 seconds.")
+        if on_attempt is not None and not callable(on_attempt):
+            raise ConfigurationError("on_attempt must be callable when provided.")
 
         self.request_timeout = float(request_timeout)
         self.max_attempts_per_route = max_attempts_per_route
@@ -711,8 +749,13 @@ class UnifiedLLM:
         self.backoff_base = float(backoff_base)
         self.max_retry_delay = float(max_retry_delay)
         self.retry_jitter = float(retry_jitter)
+        self.health_failure_threshold = health_failure_threshold
+        self.health_cooldown = float(health_cooldown)
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._sleep = _sleep
+        self._clock = _clock
+        self._on_attempt = on_attempt
+        self._health = {name: _ProviderHealthState() for name in names}
 
     @classmethod
     def from_env(
@@ -757,6 +800,10 @@ class UnifiedLLM:
             ),
             max_total_attempts=_parse_env_int(read("MAX_TOTAL_ATTEMPTS"), f"{prefix}_MAX_TOTAL_ATTEMPTS", 4),
             max_concurrency=_parse_env_int(read("MAX_CONCURRENCY"), f"{prefix}_MAX_CONCURRENCY", 10),
+            health_failure_threshold=_parse_env_int(
+                read("HEALTH_FAILURE_THRESHOLD"), f"{prefix}_HEALTH_FAILURE_THRESHOLD", 3
+            ),
+            health_cooldown=_parse_env_float(read("HEALTH_COOLDOWN"), f"{prefix}_HEALTH_COOLDOWN", 30.0),
         )
 
     @property
@@ -775,6 +822,20 @@ class UnifiedLLM:
         """Return provider names in route order."""
 
         return [route.provider.name for route in self._routes]
+
+    def get_provider_health(self) -> dict[str, ProviderHealth]:
+        """Return content-free health snapshots keyed by provider name."""
+
+        now = self._clock()
+        return {
+            provider: ProviderHealth(
+                provider=provider,
+                consecutive_failures=state.consecutive_failures,
+                cooling_down=state.open_until > now,
+                cooldown_remaining=max(0.0, state.open_until - now),
+            )
+            for provider, state in self._health.items()
+        }
 
     async def generate(
         self,
@@ -887,6 +948,8 @@ class UnifiedLLM:
         total_attempts = 0
 
         async with self._semaphore:
+            if provider is None:
+                selected = self._prioritize_healthy_routes(selected)
             for route, resolved_model in selected:
                 for route_attempt in range(1, self.max_attempts_per_route + 1):
                     if total_attempts >= self.max_total_attempts:
@@ -938,16 +1001,16 @@ class UnifiedLLM:
                             continue
                         break
                     except Exception as exc:
-                        attempts.append(
-                            Attempt(
-                                route.provider.name,
-                                resolved_model,
-                                route_attempt,
-                                _elapsed_ms(started),
-                                "adapter_error",
-                                False,
-                            )
+                        attempt = Attempt(
+                            route.provider.name,
+                            resolved_model,
+                            route_attempt,
+                            _elapsed_ms(started),
+                            "adapter_error",
+                            False,
                         )
+                        attempts.append(attempt)
+                        await self._notify_attempt(attempt)
                         raise ProviderError(
                             route.provider.name,
                             f"Provider adapter {route.provider.name!r} failed unexpectedly.",
@@ -955,14 +1018,15 @@ class UnifiedLLM:
                             attempts=attempts,
                         ) from exc
                     else:
-                        attempts.append(
-                            Attempt(
-                                route.provider.name,
-                                resolved_model,
-                                route_attempt,
-                                _elapsed_ms(started),
-                            )
+                        attempt = Attempt(
+                            route.provider.name,
+                            resolved_model,
+                            route_attempt,
+                            _elapsed_ms(started),
                         )
+                        attempts.append(attempt)
+                        self._record_success(route.provider.name)
+                        await self._notify_attempt(attempt)
                         return replace(
                             response,
                             provider=route.provider.name,
@@ -981,16 +1045,16 @@ class UnifiedLLM:
         started: float,
         attempts: list[Attempt],
     ) -> bool:
-        attempts.append(
-            Attempt(
-                route.provider.name,
-                model,
-                route_attempt,
-                _elapsed_ms(started),
-                f"http_{error.status_code}" if error.status_code is not None else "provider_error",
-                error.retryable,
-            )
+        attempt = Attempt(
+            route.provider.name,
+            model,
+            route_attempt,
+            _elapsed_ms(started),
+            f"http_{error.status_code}" if error.status_code is not None else "provider_error",
+            error.retryable,
         )
+        attempts.append(attempt)
+        await self._notify_attempt(attempt)
         if not error.retryable:
             message = (
                 f"Provider {route.provider.name!r} returned HTTP {error.status_code}."
@@ -1004,6 +1068,9 @@ class UnifiedLLM:
                 retryable=False,
                 attempts=attempts,
             ) from error
+        cooling_down = self._record_failure(route.provider.name)
+        if cooling_down:
+            return False
         if route_attempt >= self.max_attempts_per_route:
             return False
 
@@ -1016,6 +1083,43 @@ class UnifiedLLM:
         if delay:
             await self._sleep(delay)
         return True
+
+    def _prioritize_healthy_routes(self, selected: Sequence[tuple[Route, str]]) -> tuple[tuple[Route, str], ...]:
+        now = self._clock()
+
+        def priority(item: tuple[Route, str]) -> tuple[bool, float]:
+            state = self._health[item[0].provider.name]
+            cooling_down = state.open_until > now
+            return cooling_down, state.open_until if cooling_down else 0.0
+
+        return tuple(sorted(selected, key=priority))
+
+    def _record_failure(self, provider: str) -> bool:
+        if self.health_failure_threshold == 0:
+            return False
+        state = self._health[provider]
+        state.consecutive_failures += 1
+        if state.consecutive_failures < self.health_failure_threshold:
+            return False
+        state.open_until = self._clock() + self.health_cooldown
+        return self.health_cooldown > 0
+
+    def _record_success(self, provider: str) -> None:
+        state = self._health[provider]
+        state.consecutive_failures = 0
+        state.open_until = 0.0
+
+    async def _notify_attempt(self, attempt: Attempt) -> None:
+        if self._on_attempt is None:
+            return
+        try:
+            result = self._on_attempt(attempt)
+            if inspect.isawaitable(result):
+                await result
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
 
     def _validate_request(
         self,
@@ -1246,6 +1350,7 @@ UnifiedLLMService = UnifiedLLM
 
 __all__ = [
     "Attempt",
+    "AttemptHook",
     "ConfigurationError",
     "FallbackExhausted",
     "Message",
@@ -1253,6 +1358,7 @@ __all__ = [
     "OpenAIResponsesProvider",
     "Provider",
     "ProviderError",
+    "ProviderHealth",
     "RequestValidationError",
     "Route",
     "ToolDefinition",
