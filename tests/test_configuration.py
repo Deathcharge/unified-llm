@@ -29,11 +29,15 @@ def test_from_env_builds_a_local_route_without_a_key() -> None:
             "UNIFIED_LLM_MAX_ATTEMPTS_PER_ROUTE": "1",
             "UNIFIED_LLM_MAX_TOTAL_ATTEMPTS": "1",
             "UNIFIED_LLM_MAX_CONCURRENCY": "2",
+            "UNIFIED_LLM_HEALTH_FAILURE_THRESHOLD": "4",
+            "UNIFIED_LLM_HEALTH_COOLDOWN": "12.5",
         }
     )
     assert client.get_available_providers() == ["local"]
     assert client.routes[0].model == "local-model"
     assert client.request_timeout == 5
+    assert client.health_failure_threshold == 4
+    assert client.health_cooldown == 12.5
 
 
 def test_from_env_requires_model_and_default_endpoint_key() -> None:
@@ -50,6 +54,10 @@ def test_from_env_requires_model_and_default_endpoint_key() -> None:
         (
             {"UNIFIED_LLM_MODEL": "m", "UNIFIED_LLM_API_KEY": "k", "UNIFIED_LLM_MAX_CONCURRENCY": "x"},
             "integer",
+        ),
+        (
+            {"UNIFIED_LLM_MODEL": "m", "UNIFIED_LLM_API_KEY": "k", "UNIFIED_LLM_HEALTH_COOLDOWN": "x"},
+            "number",
         ),
         (
             {"UNIFIED_LLM_MODEL": "m", "UNIFIED_LLM_API_KEY": "k", "UNIFIED_LLM_ALLOW_INSECURE_HTTP": "x"},

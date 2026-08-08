@@ -30,7 +30,9 @@ The Responses adapter shares the same bounded HTTP transport and error classific
 
 The router validates the exact provider payload before network I/O, including the resolved model and generation fields, then holds one concurrency permit for the logical request. It validates and bounds normalized results from built-in and custom adapters before returning them. Each route receives at most `max_attempts_per_route`; the request receives at most `max_total_attempts`. Retry delay uses bounded exponential backoff, optional jitter, and a capped `Retry-After` value.
 
-Permanent provider failures stop immediately. Transient failures can retry and move to the next route. Cancellation propagates immediately. Unexpected custom-adapter exceptions are wrapped without copying their text.
+Permanent provider failures stop immediately. Transient failures can retry and move to the next route. Repeated transient failures maintain provider-local health state; cooling providers move behind healthy routes while remaining last-resort fallbacks. Explicit route selection is never silently overridden. Cancellation propagates immediately. Unexpected custom-adapter exceptions are wrapped without copying their text.
+
+The optional attempt observer receives only immutable sanitized metadata. Observer failures cannot turn a successful provider response into an application failure, and the core performs no logging or exporter I/O itself.
 
 ## Trust boundaries
 
@@ -55,7 +57,7 @@ application data and configuration (trusted host)
 
 ## Resource and cost bounds
 
-Defaults are 30 seconds per attempt, two attempts per route, four attempts total, ten concurrent logical requests, 200,000 message-content characters, 1,000,000 exact serialized request bytes, 2,000,000 normalized response bytes, 1,000,000 response characters, 128 tool calls, 32,768 output tokens, and a five-second maximum retry delay. The built-in HTTP adapter also caps raw success bodies at 2,000,000 bytes. Constructor validation sets absolute safety ceilings.
+Defaults are 30 seconds per attempt, two attempts per route, four attempts total, ten concurrent logical requests, 200,000 message-content characters, 1,000,000 exact serialized request bytes, 2,000,000 normalized response bytes, 1,000,000 response characters, 128 tool calls, 32,768 output tokens, a five-second maximum retry delay, and a 30-second health cooldown after three consecutive transient failures. The built-in HTTP adapter also caps raw success bodies at 2,000,000 bytes. Constructor validation sets absolute safety ceilings.
 
 Retries are not perfectly idempotent: a provider can finish generation while the response is lost. The bounded attempt count limits amplification; applications with stricter budgets should use one attempt per route and lower token limits.
 

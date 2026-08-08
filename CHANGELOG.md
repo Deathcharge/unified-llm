@@ -9,6 +9,8 @@ All notable changes to this project will be documented here. The project follows
 - Configurable raw and normalized response byte limits, response character limits, and tool-call count limits.
 - Runtime validation for normalized responses returned by every provider adapter.
 - A stateless-by-default OpenAI Responses API adapter with text, refusal, function-call, and tool-result normalization.
+- Content-free sync/async attempt observation and inspectable provider health snapshots.
+- Cross-request transient-failure cooldown that deprioritizes unhealthy routes without removing last-resort fallback.
 
 ### Changed
 

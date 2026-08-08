@@ -62,10 +62,15 @@ UnifiedLLM(
     backoff_base=0.25,
     max_retry_delay=5.0,
     retry_jitter=0.1,
+    health_failure_threshold=3,
+    health_cooldown=30.0,
+    on_attempt=None,
 )
 ```
 
 Routes are tried in order when neither `provider` nor `model` selects a single destination.
+
+Repeated transient failures increment provider-local health state. At `health_failure_threshold`, that provider is moved behind healthy routes for `health_cooldown` seconds. Set the threshold to `0` to disable health-aware ordering. Explicit provider selection preserves operator control and bypasses reordering.
 
 ### `UnifiedLLM.from_env(prefix="UNIFIED_LLM", *, environ=None)`
 
@@ -81,7 +86,7 @@ All methods are async.
 - `chat_with_metadata(..., tools=None) -> UnifiedLLMResponse`
 - `chat_with_tools(messages, *, tools, ...) -> UnifiedLLMResponse`
 
-Messages are mappings with a supported `role` (`assistant`, `developer`, `system`, `tool`, or `user`) and non-empty string `content`. Additional JSON-serializable message fields are preserved for compatible endpoints.
+Messages are mappings with a supported `role` (`assistant`, `developer`, `system`, `tool`, or `user`) and non-empty string `content`. An assistant turn may instead contain a non-empty `tool_calls` list for function continuation. Additional JSON-serializable message fields are preserved for compatible endpoints.
 
 Convenience methods raise the same typed errors as metadata methods; they never convert errors to empty strings.
 
@@ -101,6 +106,8 @@ Convenience methods raise the same typed errors as metadata methods; they never 
 ### `Attempt`
 
 Contains `provider`, `model`, one-based route-attempt `number`, `latency_ms`, sanitized `error`, and `retryable`. It intentionally excludes endpoints, headers, prompts, response bodies, and exception text from unexpected adapters.
+
+`on_attempt` accepts a sync or async callback receiving this value after every completed attempt. Callback exceptions are ignored, except cancellation. `get_provider_health() -> dict[str, ProviderHealth]` returns provider name, consecutive transient failures, cooldown state, and remaining cooldown seconds without application content.
 
 ## Errors
 
