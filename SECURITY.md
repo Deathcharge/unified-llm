@@ -16,6 +16,7 @@ Samsarix LLC does not publish a response-time or remediation-time service-level 
 
 - Endpoint URLs, API keys, model IDs, custom headers, and custom provider adapters are trusted operator configuration.
 - Message and tool content can be untrusted and crosses the configured provider boundary as JSON.
+- Normalized provider text and metadata remain untrusted output; terminal and log consumers must encode control characters.
 - The core stores no prompts, responses, keys, usage records, or telemetry.
 - Remote provider retention, training, authorization, quotas, and billing remain operator responsibilities.
 - Retries are bounded and transient-only, but a lost response can still duplicate provider work.

@@ -20,8 +20,8 @@ async def main() -> None:
             max_tokens=300,
             temperature=0.2,
         )
-        print(response.content)
-        print(f"provider={response.provider} model={response.model} tokens={response.total_tokens}")
+        print(f"content={response.content!r}")
+        print(f"provider={response.provider!r} model={response.model!r} tokens={response.total_tokens}")
 
 
 if __name__ == "__main__":

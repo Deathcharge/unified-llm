@@ -37,3 +37,20 @@ def test_release_workflow_uses_tokenless_approved_publication() -> None:
     assert "python -m pytest --cov=unified_llm" in source
     assert "password:" not in source
     assert "secrets." not in source
+    assert 'test "$GITHUB_SHA" = "$(git rev-parse FETCH_HEAD)"' in source
+    assert "pip install --require-hashes -r requirements/release-build.txt" in source
+    assert "python -m build --no-isolation" in source
+
+
+def test_release_attestation_privileges_are_isolated_from_project_code() -> None:
+    source = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
+    build_jobs, after_attest = source.split("  attest:\n", maxsplit=1)
+    attest_job, publish_job = after_attest.split("  publish-to-pypi:\n", maxsplit=1)
+
+    assert "id-token: write" not in build_jobs
+    assert "attestations: write" not in build_jobs
+    assert "id-token: write" in attest_job
+    assert "actions/attest@" in attest_job
+    assert "python -m pip install" not in attest_job
+    assert "python -m pytest" not in attest_job
+    assert "needs: attest" in publish_job

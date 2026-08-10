@@ -10,12 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  build-and-attest:
+  quality:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,20 +28,34 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: python -c "import os, unified_llm; expected = f'v{unified_llm.__version__}'; assert os.environ['RELEASE_TAG'] == expected, f'tag must be {expected}'"
+      - name: Require the tag to identify the current public main commit
+        if: github.ref_type == 'tag'
+        run: |
+          git fetch --no-tags origin main
+          test "$GITHUB_SHA" = "$(git rev-parse FETCH_HEAD)"
       - name: Verify the exact release source
         run: |
           python -m ruff check .
           python -m ruff format --check .
           python -m mypy unified_llm tests examples
           python -m pytest --cov=unified_llm --cov-report=term-missing
-      - name: Build and validate distributions
-        run: |
-          python -m build
-          python -m twine check dist/*
-      - name: Generate SLSA provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+
+  build-distributions:
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          subject-path: dist/*
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install the hash-locked artifact builder
+        run: python -m pip install --require-hashes -r requirements/release-build.txt
+      - name: Build distributions without isolated dependency resolution
+        run: python -m build --no-isolation
       - name: Store distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -52,9 +64,45 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  validate-distributions:
+    needs: build-distributions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install validation tooling
+        run: python -m pip install "twine>=6,<7"
+      - name: Download completed distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
+  attest:
+    needs: validate-distributions
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download completed distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Generate SLSA provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+
   publish-to-pypi:
     if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build-and-attest
+    needs: attest
     runs-on: ubuntu-latest
     environment:
       name: pypi

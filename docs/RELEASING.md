@@ -7,7 +7,7 @@ No package has been published from this repository yet. This process makes relea
 1. Confirm that the `unified-llm` PyPI project name is available or controlled by Samsarix LLC.
 2. In PyPI, register a pending GitHub Trusted Publisher for owner `Deathcharge`, repository `unified-llm`, workflow `release.yml`, and environment `pypi`.
 3. Create the GitHub `pypi` environment and require manual approval. Restrict deployment to protected version tags when repository policy permits it.
-4. Protect `main` and release tags, require the CI checks, and review any change to `.github/workflows/release.yml` as a credential-equivalent security change. Release builds intentionally do not restore dependency caches.
+4. Protect `main` and release tags, require the CI checks, and review any change to `.github/workflows/release.yml` or `requirements/release-build.txt` as a credential-equivalent security change. Release builds intentionally do not restore dependency caches.
 5. Ensure at least two Samsarix-controlled recovery methods exist for the PyPI and GitHub owner accounts.
 
 Do not add a long-lived PyPI token to repository secrets. The workflow requests a short-lived OIDC credential only inside the `pypi` environment.
@@ -24,7 +24,7 @@ Before tagging:
 
 ## Publication
 
-Create and push an annotated tag exactly matching `v` plus the package version, for example `v0.1.0`. The release workflow rejects a mismatched tag, rebuilds the source distribution and wheel, checks their metadata, creates GitHub-hosted SLSA provenance, and pauses at the protected `pypi` environment. An owner must inspect the run and approve that deployment before PyPI receives anything.
+Create and push an annotated tag exactly matching `v` plus the package version, for example `v0.1.0`, on the current public `main` commit. The release workflow rejects a mismatched or off-main tag. It builds the source distribution and wheel with the hash-locked builder closure in `requirements/release-build.txt`, validates them in a separate unprivileged job, creates GitHub-hosted SLSA provenance in an attestation-only OIDC job, and pauses at the protected `pypi` environment. An owner must inspect the run and approve that deployment before PyPI receives anything.
 
 The official PyPA publishing action uses Trusted Publishing and uploads PyPI attestations by default. After approval, verify the project page, both distributions, their hashes and attestations, and installation in a clean supported Python environment. Then create the GitHub release from the same tag and attach or link the verification record.
 

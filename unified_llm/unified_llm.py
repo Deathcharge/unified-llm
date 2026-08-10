@@ -943,11 +943,11 @@ class UnifiedLLM:
         """Run the request through the selected bounded route set."""
 
         selected = self._select_routes(provider=provider, model=model)
-        normalized_messages = self._validate_request(messages, selected, max_tokens, temperature, tools)
         attempts: list[Attempt] = []
         total_attempts = 0
 
         async with self._semaphore:
+            normalized_messages = self._validate_request(messages, selected, max_tokens, temperature, tools)
             if provider is None:
                 selected = self._prioritize_healthy_routes(selected)
             for route, resolved_model in selected:
@@ -956,6 +956,7 @@ class UnifiedLLM:
                         raise FallbackExhausted(attempts)
                     total_attempts += 1
                     started = time.perf_counter()
+                    terminal_error: ProviderError | None = None
                     try:
                         response = await asyncio.wait_for(
                             route.provider.complete(
@@ -989,7 +990,7 @@ class UnifiedLLM:
                             continue
                         break
                     except ProviderError as exc:
-                        should_continue = await self._handle_provider_error(
+                        outcome = await self._handle_provider_error(
                             exc,
                             route,
                             resolved_model,
@@ -997,10 +998,13 @@ class UnifiedLLM:
                             started,
                             attempts,
                         )
-                        if should_continue:
+                        if isinstance(outcome, ProviderError):
+                            terminal_error = outcome
+                        elif outcome:
                             continue
-                        break
-                    except Exception as exc:
+                        else:
+                            break
+                    except Exception:
                         attempt = Attempt(
                             route.provider.name,
                             resolved_model,
@@ -1011,12 +1015,12 @@ class UnifiedLLM:
                         )
                         attempts.append(attempt)
                         await self._notify_attempt(attempt)
-                        raise ProviderError(
+                        terminal_error = ProviderError(
                             route.provider.name,
                             f"Provider adapter {route.provider.name!r} failed unexpectedly.",
                             retryable=False,
                             attempts=attempts,
-                        ) from exc
+                        )
                     else:
                         attempt = Attempt(
                             route.provider.name,
@@ -1033,6 +1037,10 @@ class UnifiedLLM:
                             model=response.model or resolved_model,
                             attempts=tuple(attempts),
                         )
+                    if terminal_error is not None:
+                        # Raise outside the adapter exception handler so secret-bearing
+                        # causes and contexts cannot cross the public SDK boundary.
+                        raise terminal_error from None
 
         raise FallbackExhausted(attempts)
 
@@ -1044,7 +1052,7 @@ class UnifiedLLM:
         route_attempt: int,
         started: float,
         attempts: list[Attempt],
-    ) -> bool:
+    ) -> bool | ProviderError:
         attempt = Attempt(
             route.provider.name,
             model,
@@ -1061,13 +1069,13 @@ class UnifiedLLM:
                 if error.status_code is not None
                 else f"Provider {route.provider.name!r} failed."
             )
-            raise ProviderError(
+            return ProviderError(
                 route.provider.name,
                 message,
                 status_code=error.status_code,
                 retryable=False,
                 attempts=attempts,
-            ) from error
+            )
         cooling_down = self._record_failure(route.provider.name)
         if cooling_down:
             return False
@@ -1169,9 +1177,9 @@ class UnifiedLLM:
             )
         if tools is not None and not all(isinstance(tool, Mapping) for tool in tools):
             raise RequestValidationError("Every tool definition must be a mapping.")
-        try:
-            serialized_requests = [
-                json.dumps(
+        for route, resolved_model in selected:
+            try:
+                serialized = json.dumps(
                     self._request_payload(
                         route.provider,
                         normalized,
@@ -1184,14 +1192,13 @@ class UnifiedLLM:
                     allow_nan=False,
                     separators=(",", ":"),
                 ).encode("utf-8")
-                for route, resolved_model in selected
-            ]
-        except (TypeError, ValueError, RecursionError) as exc:
-            raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
-        if any(len(serialized) > self.max_request_bytes for serialized in serialized_requests):
-            raise RequestValidationError(
-                f"Serialized provider request exceeds the configured {self.max_request_bytes}-byte request limit."
-            )
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise RequestValidationError("Messages and tools must be JSON serializable.") from exc
+            if len(serialized) > self.max_request_bytes:
+                error_message = (
+                    f"Serialized provider request exceeds the configured {self.max_request_bytes}-byte request limit."
+                )
+                raise RequestValidationError(error_message)
         return tuple(normalized)
 
     @staticmethod

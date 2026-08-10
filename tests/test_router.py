@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import traceback
 
 import pytest
 
@@ -222,7 +223,22 @@ async def test_unexpected_adapter_exception_is_sanitized() -> None:
     with pytest.raises(ProviderError) as caught:
         await client.generate("Hi")
     assert "secret-token" not in str(caught.value)
+    assert "secret-token" not in "".join(traceback.format_exception(caught.value))
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
     assert caught.value.attempts[0].error == "adapter_error"
+
+
+async def test_permanent_provider_error_does_not_retain_secret_context() -> None:
+    provider = ScriptedProvider("primary", [ProviderError("primary", "secret-body", retryable=False)])
+    client = UnifiedLLM([Route(provider, "model-a")])
+
+    with pytest.raises(ProviderError) as caught:
+        await client.generate("Hi")
+
+    assert "secret-body" not in "".join(traceback.format_exception(caught.value))
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
 
 
 async def test_context_manager_closes_provider() -> None:

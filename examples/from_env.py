@@ -15,8 +15,8 @@ async def main() -> None:
             )
     except UnifiedLLMError as exc:
         raise SystemExit(f"Request failed safely: {exc}") from exc
-    print(result.content)
-    print(f"provider={result.provider} model={result.model} total_tokens={result.total_tokens}")
+    print(f"content={result.content!r}")
+    print(f"provider={result.provider!r} model={result.model!r} total_tokens={result.total_tokens}")
 
 
 if __name__ == "__main__":
