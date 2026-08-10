@@ -13,6 +13,7 @@ All notable changes to this project will be documented here. The project follows
 - Cross-request transient-failure cooldown that deprioritizes unhealthy routes without removing last-resort fallback.
 - A canonical support-ticket triage reference consumer and deterministic public-API contract fixture.
 - Cross-version installed-wheel smoke tests, supply-chain contract tests, and an attested PyPI Trusted Publishing workflow.
+- Commit-pinned, Node 24-native GitHub Actions for checkout and supported-Python setup.
 
 ### Changed
 
