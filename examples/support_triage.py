@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from unified_llm import OpenAIResponsesProvider, Route, UnifiedLLM
+from unified_llm import ConfigurationError, OpenAIResponsesProvider, Route, UnifiedLLM
 
 TRIAGE_TOOL: dict[str, Any] = {
     "type": "function",
@@ -106,7 +106,7 @@ async def triage_ticket(client: UnifiedLLM, ticket: str) -> TriageDecision:
     return TriageDecision(
         queue=queue,
         urgency=urgency,
-        summary=summary,
+        summary=f"{urgency.capitalize()}-urgency ticket routed to {queue} support.",
         provider=response.provider,
         model=response.model,
         total_tokens=response.total_tokens,
@@ -114,7 +114,10 @@ async def triage_ticket(client: UnifiedLLM, ticket: str) -> TriageDecision:
 
 
 async def main() -> None:
-    async with build_client(os.environ["OPENAI_API_KEY"]) as client:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ConfigurationError("OPENAI_API_KEY is required.")
+    async with build_client(api_key) as client:
         decision = await triage_ticket(client, input("Support ticket: "))
     print(decision)
 

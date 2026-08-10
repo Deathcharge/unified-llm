@@ -21,10 +21,10 @@ It does not import implementation modules, private symbols, legacy services, per
 | Boundary | Consumer requirement | Evidence |
 | --- | --- | --- |
 | Authentication | The API key is supplied only to the provider adapter and becomes an authorization header, never JSON payload data. | `test_support_triage_public_api_contract` |
-| Privacy | Responses requests set `store=false`; the router has no persistence or content logging; the observer receives only sanitized attempt metadata. | Exact outbound payload assertion and core architecture tests |
+| Privacy | Responses requests set `store=false`; the router has no persistence or content logging; the observer receives only sanitized attempt metadata. Model-written summary text is validated and discarded, then replaced with a local queue/urgency template. | Exact outbound payload assertion, adversarial summary fixture, and core architecture tests |
 | Request safety | Ticket and strict tool schema are included in the exact request-byte calculation. The reference client caps requests at 64,000 bytes and output at 1,000 tokens. | Router request-bound tests and reference client configuration |
 | Response safety | Raw responses are capped at 256,000 bytes, normalized content at 8,000 characters, and tool calls at four. | Reference client configuration and provider-bound tests |
-| Decision integrity | Exactly one named function call is required. JSON must contain only `queue`, `urgency`, and `summary`; enum values and summary length are checked after parsing. | Happy-path and malformed-decision parameterized tests |
+| Decision integrity | Exactly one named function call is required. JSON must contain only `queue`, `urgency`, and `summary`; enum values and summary length are checked after parsing. The returned summary is generated locally from validated enums. | Happy-path, adversarial-summary, and malformed-decision tests |
 | Failure behavior | Configuration, validation, provider, and fallback failures remain typed SDK exceptions. Invalid business output becomes a consumer-owned `ValueError`; no empty success value is returned. | Consumer negative tests and SDK error contract |
 | Metadata | The decision records normalized provider, served model, and reported token total for audit/cost attribution. | Happy-path fixture |
 | Lifecycle | The reference uses `async with UnifiedLLM(...)`, closing SDK-owned HTTP resources deterministically. | `main()` and lifecycle tests |

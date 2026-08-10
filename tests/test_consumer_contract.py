@@ -6,8 +6,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from examples.support_triage import TRIAGE_TOOL, TriageDecision, triage_ticket
-from unified_llm import OpenAIResponsesProvider, Route, UnifiedLLM, UnifiedLLMResponse
+from examples.support_triage import TRIAGE_TOOL, TriageDecision, main, triage_ticket
+from unified_llm import ConfigurationError, OpenAIResponsesProvider, Route, UnifiedLLM, UnifiedLLMResponse
 
 ROOT = Path(__file__).parents[1]
 
@@ -16,6 +16,7 @@ async def test_support_triage_public_api_contract() -> None:
     seen: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
         seen["url"] = str(request.url)
         seen["authorization"] = request.headers.get("Authorization")
         seen["payload"] = json.loads(request.content)
@@ -52,11 +53,12 @@ async def test_support_triage_public_api_contract() -> None:
     assert result == TriageDecision(
         queue="security",
         urgency="critical",
-        summary="Possible account takeover",
+        summary="Critical-urgency ticket routed to security support.",
         provider="openai",
         model="gpt-5-mini-2026-06-01",
         total_tokens=42,
     )
+    assert seen["method"] == "POST"
     assert seen["url"] == "https://api.openai.com/v1/responses"
     assert seen["authorization"] == "Bearer test-secret"
     payload = seen["payload"]
@@ -122,6 +124,23 @@ async def test_support_triage_rejects_empty_ticket() -> None:
     client = UnifiedLLM([Route(DecisionProvider(arguments="{}"), "contract-model")])
     with pytest.raises(ValueError, match="ticket"):
         await triage_ticket(client, " ")
+
+
+async def test_support_triage_never_returns_model_supplied_summary() -> None:
+    secret = "sk-secret-that-must-not-cross-the-boundary"
+    provider = DecisionProvider(arguments=json.dumps({"queue": "billing", "urgency": "high", "summary": secret}))
+    client = UnifiedLLM([Route(provider, "contract-model")])
+
+    decision = await triage_ticket(client, "My payment failed")
+
+    assert decision.summary == "High-urgency ticket routed to billing support."
+    assert secret not in decision.summary
+
+
+async def test_support_triage_main_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(ConfigurationError, match="OPENAI_API_KEY"):
+        await main()
 
 
 def test_reference_consumer_uses_only_public_package_imports() -> None:

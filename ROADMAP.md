@@ -6,7 +6,7 @@ This roadmap separates four gates: merge, release, publication, and flagship ado
 
 Portfolio role: **reusable library or sdk**. Keep this as a small, independently versioned package. Samsarix Unified should consume it only through a public API adapter; private monorepo imports and copied implementations are out of scope.
 
-Current disposition: Already integrated; roadmap changes should use an ordinary review branch.
+Current disposition: The library is productized on its own default branch, but no external canonical consumer has adopted this reference contract yet. Roadmap changes should use an ordinary review branch.
 
 ## Stabilize the productized default
 
