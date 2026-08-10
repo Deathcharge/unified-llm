@@ -165,7 +165,7 @@ python -m build
 python -m twine check dist/*
 ```
 
-Tests use fakes and `httpx.MockTransport`; they do not need credentials and do not call external APIs. CI runs lint, type checking, tests, package build, metadata checks, and a wheel smoke test. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Tests use fakes and `httpx.MockTransport`; they do not need credentials and do not call external APIs. CI runs lint, type checking, tests, package build, metadata checks, and installed-wheel smoke tests on every supported Python version. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Architecture
 
@@ -222,11 +222,11 @@ See [SUPPORT.md](SUPPORT.md) for the information to include and the prerelease s
 The repository is a coherent release candidate for local evaluation. Public package publication remains blocked on:
 
 1. owner-authorized live endpoint smoke tests;
-2. owner authorization and configuration for PyPI trusted publishing/signing.
+2. owner configuration and approval of the prepared PyPI Trusted Publishing environment.
 
 The package name was not present on PyPI when checked on 2026-07-28; re-check immediately before publishing. No package has been published or production infrastructure changed by this work.
 
-See [docs/PRODUCTIZATION.md](docs/PRODUCTIZATION.md) for the evidence, remaining work, and acceptance criteria.
+See [docs/PRODUCTIZATION.md](docs/PRODUCTIZATION.md) for the evidence and remaining gates, and [docs/RELEASING.md](docs/RELEASING.md) for the attested, tokenless release process.
 
 ## Contributing
 
