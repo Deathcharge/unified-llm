@@ -18,8 +18,12 @@ All notable changes to this project will be documented here. The project follows
 ### Changed
 
 - Request byte accounting now measures each exact outbound provider body, including its resolved model and generation fields.
+- Request validation and one-at-a-time route serialization now run inside the configured concurrency boundary.
 - The built-in HTTP adapter now streams successful response bodies into a bounded buffer before JSON decoding.
 - Built-in provider-specific payload builders now let the router account for exact Chat Completions and Responses request bodies.
+- Sanitized adapter failures no longer retain secret-bearing exception causes or contexts.
+- Release artifacts use a hash-locked builder closure, a current-main tag gate, and an isolated attestation-only OIDC job.
+- Runnable provider examples represent untrusted text safely before writing it to a terminal.
 
 ## 0.1.0 - 2026-07-28
 
