@@ -187,6 +187,8 @@ The built-in HTTP providers own API translation. `UnifiedLLM` owns policy and ha
 
 For new OpenAI integrations, use `OpenAIResponsesProvider`. It targets `/responses`, keeps server-side storage disabled by default, and participates in the same retry, fallback, request-size, and response-size boundaries. See [examples/responses_api.py](examples/responses_api.py).
 
+For a production-shaped consumer, see [examples/support_triage.py](examples/support_triage.py) and its [consumer contract](docs/CONSUMER_CONTRACT.md). The example routes support tickets through a strict function schema and validates every model-supplied field before application use.
+
 ## Security, privacy, reliability, and cost
 
 - Treat endpoint URLs, API keys, models, and custom provider adapters as trusted operator configuration.
