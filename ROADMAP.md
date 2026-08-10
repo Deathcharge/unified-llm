@@ -17,7 +17,8 @@ Current disposition: Already integrated; roadmap changes should use an ordinary 
 - Completed in the next hardening increment: account for the exact outbound body, cap inbound response bytes and normalized structures, and validate custom adapters.
 - Completed in the following API increment: add a stateless-by-default OpenAI Responses adapter without weakening the shared bounds or fallback contract.
 - Completed in the health increment: expose content-free attempt observation and deprioritize repeatedly failing routes during a bounded cooldown.
-- Next: prove one canonical consumer and a capped live endpoint before publication.
+- Completed as repository evidence: a canonical support-triage reference consumer with a public-API contract fixture, explicit limits, ownership, compatibility, and rollback guidance.
+- Next: adopt the reference contract in one external canonical consumer and prove a capped live endpoint before publication.
 - Review priority: prove one consumer, green wheel CI, one capped live endpoint, and trusted publication.
 
 ## Release candidate

@@ -11,6 +11,7 @@ All notable changes to this project will be documented here. The project follows
 - A stateless-by-default OpenAI Responses API adapter with text, refusal, function-call, and tool-result normalization.
 - Content-free sync/async attempt observation and inspectable provider health snapshots.
 - Cross-request transient-failure cooldown that deprioritizes unhealthy routes without removing last-resort fallback.
+- A canonical support-ticket triage reference consumer and deterministic public-API contract fixture.
 
 ### Changed
 
