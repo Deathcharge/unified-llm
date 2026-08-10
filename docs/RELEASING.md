@@ -7,7 +7,7 @@ No package has been published from this repository yet. This process makes relea
 1. Confirm that the `unified-llm` PyPI project name is available or controlled by Samsarix LLC.
 2. In PyPI, register a pending GitHub Trusted Publisher for owner `Deathcharge`, repository `unified-llm`, workflow `release.yml`, and environment `pypi`.
 3. Create the GitHub `pypi` environment and require manual approval. Restrict deployment to protected version tags when repository policy permits it.
-4. Protect `main` and release tags, require the CI checks, and review any change to `.github/workflows/release.yml` as a credential-equivalent security change.
+4. Protect `main` and release tags, require the CI checks, and review any change to `.github/workflows/release.yml` as a credential-equivalent security change. Release builds intentionally do not restore dependency caches.
 5. Ensure at least two Samsarix-controlled recovery methods exist for the PyPI and GitHub owner accounts.
 
 Do not add a long-lived PyPI token to repository secrets. The workflow requests a short-lived OIDC credential only inside the `pypi` environment.
