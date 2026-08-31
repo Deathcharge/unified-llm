@@ -185,7 +185,9 @@ These results prove the tested local contracts, not real-provider compatibility 
 
 Next locally actionable work, ordered by release value:
 
-1. Refresh dependency/security evidence before publication and verify owner-controlled environment/tag protection settings.
+1. Recheck dependency/security evidence immediately before publication and complete owner-controlled environment/tag protection setup.
+
+Dependency evidence refreshed on 2026-08-31 with pip-audit 2.10.0: `python -m pip_audit -r requirements/release-build.txt --format json` reported no known vulnerabilities in build 1.5.0, colorama 0.4.6, packaging 24.2, pyproject-hooks 1.2.0, and setuptools 83.0.0. Auditing a temporary requirement file containing the declared runtime range `httpx>=0.27,<1` also reported none in the resolved httpx 0.28.1, httpcore 1.0.9, h11 0.16.0, anyio 4.14.2, idna 3.19, typing-extensions 4.16.0, and certifi 2026.7.22. Both commands completed successfully despite ignored cache-deserialization warnings. This is a dated advisory check of these resolutions on Python 3.11/Windows, not proof about every allowed version, application code, or future advisories.
 
 Preprocessing now has direct regression coverage in `tests/test_router.py`: a waiting request cannot enter validation before admission, cancelling a waiter never validates or consumes capacity, and an oversized first route prevents construction of later payloads. Both cancellation and validation rejection are followed by successful requests through the same single-permit client. These checks establish those specific boundaries, not an aggregate memory ceiling for arbitrary nested input graphs.
 
@@ -197,6 +199,8 @@ The engineering disposition is **release candidate with named external gates and
 - A hosted proxy, UI, authentication, persistence, and billing are out of scope because they duplicate mature products and are unsupported by repository evidence.
 
 ## Owner-, credential-, legal-, or production-blocked tasks
+
+- August 31 read-only GitHub checks confirmed that `pypi` environment setup is absent, `main` branch protection is disabled, and the repository has no rulesets. The owner must authorize protection changes and choose required release reviewers. Until then, manual publication approval is not enforced by the workflow's environment name. See `docs/RELEASING.md` for exact recheck commands.
 
 - Live provider validation requires an owner-supplied endpoint, model, API key, and authorization to incur usage. Automated tests will use deterministic mocks instead.
 - Publishing to PyPI, creating signing identities, configuring trusted publishing, and creating a GitHub release require owner authorization.
