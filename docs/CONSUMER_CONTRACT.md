@@ -42,6 +42,15 @@ python -m ruff format --check .
 
 The HTTP fixture uses `httpx.MockTransport`; it requires no credentials, sends no network traffic, and asserts the provider boundary directly.
 
+To verify the built distribution rather than SDK source:
+
+```bash
+python -m build
+python scripts/verify_wheel_consumer.py dist/unified_llm-0.1.0-py3-none-any.whl
+```
+
+The verifier creates a fresh temporary virtual environment, installs the selected wheel plus pytest tooling, verifies the import location and typed-package marker, and copies only the consumer and its contract tests. It executes those tests outside the checkout in Python isolated mode; no SDK source or repository `conftest.py` is copied. Temporary files are removed on success or failure. Package installation requires index access, but the consumer tests use no live provider or credentials. CI runs this same check on Python 3.10–3.13.
+
 ## Live conformance gate
 
 Before describing this consumer as live-compatible, a maintainer must run one capped request against the intended endpoint using a revocable, least-privilege key and record:
