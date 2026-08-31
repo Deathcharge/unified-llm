@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import traceback
+from unittest.mock import patch
 
 import pytest
 
@@ -198,6 +199,58 @@ async def test_concurrency_is_bounded() -> None:
     provider.gate.set()
     assert list(await asyncio.gather(first, second)) == ["one", "two"]
     assert provider.max_active == 1
+
+
+async def test_waiting_request_does_not_preprocess_until_admitted() -> None:
+    provider = ScriptedProvider("primary", [response("admitted")])
+    client = UnifiedLLM([Route(provider, "model-a")], max_concurrency=1)
+    await client._semaphore.acquire()
+    with patch.object(client, "_validate_request", wraps=client._validate_request) as validate:
+        task = asyncio.create_task(client.generate("Hi"))
+        try:
+            await asyncio.sleep(0)
+            assert not task.done()
+            validate.assert_not_called()
+            assert provider.calls == []
+        finally:
+            client._semaphore.release()
+            result = await task
+        assert result == "admitted"
+        validate.assert_called_once()
+
+
+async def test_cancelled_waiter_never_preprocesses_or_consumes_capacity() -> None:
+    provider = ScriptedProvider("primary", [response("next")])
+    client = UnifiedLLM([Route(provider, "model-a")], max_concurrency=1)
+    await client._semaphore.acquire()
+    with patch.object(client, "_validate_request", wraps=client._validate_request) as validate:
+        task = asyncio.create_task(client.generate("cancel me"))
+        try:
+            await asyncio.sleep(0)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            validate.assert_not_called()
+            assert provider.calls == []
+        finally:
+            client._semaphore.release()
+        assert await asyncio.wait_for(client.generate("next"), timeout=1) == "next"
+        validate.assert_called_once()
+
+
+async def test_oversized_first_route_stops_before_building_later_payloads() -> None:
+    first = ScriptedProvider("first", [response()])
+    second = ScriptedProvider("second", [response()])
+    client = UnifiedLLM(
+        [Route(first, "large-model" * 30), Route(second, "small")], max_request_bytes=200, max_concurrency=1
+    )
+    with patch.object(client, "_request_payload", wraps=client._request_payload) as payload:
+        with pytest.raises(RequestValidationError, match="byte request limit"):
+            await client.generate("Hi")
+        payload.assert_called_once()
+    assert first.calls == second.calls == []
+    # Validation failure must release admission capacity for the next request.
+    assert await asyncio.wait_for(client.generate("Hi", provider="second"), timeout=1) == "ok"
 
 
 async def test_cancellation_is_not_retried() -> None:
