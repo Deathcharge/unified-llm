@@ -14,6 +14,8 @@ Do not add a long-lived PyPI token to repository secrets. The workflow requests 
 
 ## Candidate gate
 
+`python -m pytest tests/test_release_gate.py -q` exercises the workflow's current-main check against disposable local Git repositories. It accepts current main and rejects stale/off-main commits, a missing SHA, and a failed fetch even when `FETCH_HEAD` already exists. It never pushes real release tags. Windows development requires Git for Windows (including its bundled Bash); CI uses Bash on Ubuntu. This fixture does not verify owner-configured GitHub tag protection or environment reviewers.
+
 Before tagging:
 
 1. update `pyproject.toml`, `unified_llm.__version__`, and `CHANGELOG.md` to the same version;
