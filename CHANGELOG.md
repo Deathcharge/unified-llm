@@ -6,6 +6,7 @@ All notable changes to this project will be documented here. The project follows
 
 ### Added
 
+- Isolated installed-wheel verification of the canonical support-triage consumer, shared by local checks and the supported-Python CI matrix.
 - Configurable raw and normalized response byte limits, response character limits, and tool-call count limits.
 - Runtime validation for normalized responses returned by every provider adapter.
 - A stateless-by-default OpenAI Responses API adapter with text, refusal, function-call, and tool-result normalization.

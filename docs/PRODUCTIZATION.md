@@ -181,13 +181,12 @@ Re-run on 2026-08-31 using Python 3.11.9 against `73f932e`:
 | PR #9 merged revision | `73f932e5c4499df5ba2e1f73175f2953910d00a6`. |
 | [Release dry run 31425066883](https://github.com/Deathcharge/unified-llm/actions/runs/31425066883) | Historical August 10 run rechecked: success on that revision; publication skipped. |
 
-These results prove the tested local contracts, not real-provider compatibility or independent adoption. The manual run skipped tag-specific gates; its success does not exercise rejection of an off-main tag. Current wheel smoke tests prove installation/import on Python 3.10–3.13, not the complete consumer journey from an installed artifact.
+These results prove the tested local contracts, not real-provider compatibility or independent adoption. The manual run skipped tag-specific gates; its success does not exercise rejection of an off-main tag. The installed-wheel verification now uses `scripts/verify_wheel_consumer.py` to run the canonical consumer contract in a fresh environment outside the checkout, with SDK source excluded. The same verifier is wired into the Python 3.10–3.13 wheel matrix.
 
 Next locally actionable work, ordered by release value:
 
-1. Exercise the reference consumer through an installed wheel, outside the source checkout, using deterministic HTTP fixtures.
-2. Add targeted behavioral regressions for preprocessing admission and early multi-route size rejection; the current concurrency test covers provider I/O, not preprocessing explicitly.
-3. Verify tag-gate rejection with a local Git fixture and refresh dependency/security evidence before publication.
+1. Add targeted behavioral regressions for preprocessing admission and early multi-route size rejection; the current concurrency test covers provider I/O, not preprocessing explicitly.
+2. Verify tag-gate rejection with a local Git fixture and refresh dependency/security evidence before publication.
 
 The engineering disposition is **release candidate with named external gates and remaining verification work**, not production-ready.
 
