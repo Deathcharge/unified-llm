@@ -181,11 +181,11 @@ Re-run on 2026-08-31 using Python 3.11.9 against `73f932e`:
 | PR #9 merged revision | `73f932e5c4499df5ba2e1f73175f2953910d00a6`. |
 | [Release dry run 31425066883](https://github.com/Deathcharge/unified-llm/actions/runs/31425066883) | Historical August 10 run rechecked: success on that revision; publication skipped. |
 
-These results prove the tested local contracts, not real-provider compatibility or independent adoption. The manual run skipped tag-specific gates; its success does not exercise rejection of an off-main tag. The installed-wheel verification now uses `scripts/verify_wheel_consumer.py` to run the canonical consumer contract in a fresh environment outside the checkout, with SDK source excluded. The same verifier is wired into the Python 3.10–3.13 wheel matrix.
+These results prove the tested local contracts, not real-provider compatibility or independent adoption. The manual run skipped tag-specific gates. Separate local Git fixtures in `tests/test_release_gate.py` now execute the actual workflow main-commit shell gate: current main is accepted; stale main, off-main candidates, an empty SHA, and a failed fetch with pre-existing `FETCH_HEAD` are rejected. They do not prove GitHub environment approval or protected-tag settings. The installed-wheel verification uses `scripts/verify_wheel_consumer.py` to run the canonical consumer contract in a fresh environment outside the checkout, with SDK source excluded. The same verifier is wired into the Python 3.10–3.13 wheel matrix.
 
 Next locally actionable work, ordered by release value:
 
-1. Verify tag-gate rejection with a local Git fixture and refresh dependency/security evidence before publication.
+1. Refresh dependency/security evidence before publication and verify owner-controlled environment/tag protection settings.
 
 Preprocessing now has direct regression coverage in `tests/test_router.py`: a waiting request cannot enter validation before admission, cancelling a waiter never validates or consumes capacity, and an oversized first route prevents construction of later payloads. Both cancellation and validation rejection are followed by successful requests through the same single-permit client. These checks establish those specific boundaries, not an aggregate memory ceiling for arbitrary nested input graphs.
 
