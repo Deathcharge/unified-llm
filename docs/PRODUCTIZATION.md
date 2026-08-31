@@ -4,7 +4,13 @@ Last updated: 2026-07-28
 
 This is the living record for turning this repository into an independently useful product. It distinguishes the audited baseline from the verified release-candidate state.
 
-## Current repository assessment
+## Current repository assessment (2026-08-31)
+
+The public `main` branch is synchronized at `73f932e5c4499df5ba2e1f73175f2953910d00a6`, including merged PRs #6 through #9. The standalone SDK now includes Chat Completions and Responses adapters, content-free attempt hooks, provider-health cooldown, exact request accounting, bounded response reads, and a support-triage reference consumer. It remains an alpha library, not a deployed service or evidence of product-market fit.
+
+The current local verification is 135 tests passing with 94.69% branch-aware coverage. The earlier assessment and verification below are historical baselines, not the present branch state. The August 10 release dry run built, validated, and attested artifacts without publishing; its result was rechecked on August 31. Live endpoint conformance, independent adoption, and owner-controlled publication setup remain unverified.
+
+## Historical starting assessment (2026-07-28)
 
 The local branch began as three commits that extracted one 1,395-line Python module from `helix-unified`, added a minimal `setup.py`, and added placeholder documentation. The worktree was clean at audit start. Local `main` was three commits ahead of and three commits behind `origin/main`, but the histories have no merge base. The remote branch is a separate 15,645-line monorepo extraction with no root packaging manifest, committed Python bytecode, broad unverified examples, and a README that claims production readiness. It is not a safe upstream to merge.
 
@@ -43,14 +49,14 @@ Primary journey:
 
 ## Key product and architecture decisions
 
-- Preserve the current local history on `codex/productize-unified-llm`; do not merge the unrelated `origin/main` history.
+- The initial unrelated histories were reconciled earlier with owner authorization. Subsequent improvements use focused branches and reviewed merges into public `main`; the original divergence is not an ongoing blocker.
 - Keep the product a library. No frontend, hosted service, auth, database, telemetry, or cloud resources are justified.
-- Provide a built-in OpenAI Chat Completions-compatible HTTP adapter because that protocol is also supported by endpoints such as OpenRouter. Keep provider-specific protocols out of the first release; custom adapters use a small public protocol.
+- Provide built-in Chat Completions and Responses adapters sharing the bounded transport and router contracts. Other native provider protocols remain deferred; custom adapters use a small public protocol.
 - Retain familiar `generate`, `chat`, and metadata-returning methods, but replace empty-string failure behavior with typed exceptions.
 - Require explicit route configuration. Do not infer providers from model-name substrings or ship quickly stale model catalogs.
 - Do not cache prompts or responses in the core. Caching has privacy, retention, and tenant-isolation implications and belongs in the host application.
 - Never log API keys, prompt bodies, response bodies, or custom headers.
-- Use modern `pyproject.toml` packaging. A library does not need an application lockfile; supported dependency ranges and CI across supported Python versions are the distribution contract.
+- Use modern `pyproject.toml` packaging and compatible runtime dependency ranges. Separately lock the artifact builder's exact versions and hashes in `requirements/release-build.txt`; release construction must not resolve a mutable backend independently.
 - Reset maturity to `0.1.0`. The previous `1.0.0` label was not supported by a working import or published release evidence.
 
 ## Assumptions
@@ -102,7 +108,7 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 
 - [ ] Native support for non-OpenAI-compatible provider protocols.
 - [ ] True streaming with a documented fallback boundary.
-- [ ] Optional metrics hooks that exclude prompt/response content by default.
+- [x] Optional metrics hooks that exclude prompt/response content by default (`on_attempt`, plus provider-health snapshots).
 - [ ] Optional cost estimation supplied by the application from versioned provider pricing.
 
 ## Implementation checklist
@@ -139,14 +145,14 @@ No lint, type-check, test, build, start, or CI scripts were defined by the repos
 - Chose the standalone SDK product boundary and primary journey.
 - Rebuilt the package around explicit routes, a public provider protocol, and a conservative OpenAI-compatible transport.
 - Added validation before provider I/O, including full serialized-request byte limits, and bounded all retry, timeout, token, attempt, and concurrency behavior.
-- Added 84 network-free tests with 98.16% statement coverage.
+- Initially added 84 network-free tests with 98.16% coverage; see the dated current verification below for the expanded suite.
 - Verified Ruff lint and formatting, strict mypy checks, source and wheel builds, Twine metadata, editable installation, built-wheel import, and the offline fallback example.
 - Audited the fully resolved runtime dependency set with `pip-audit`; no known vulnerabilities were reported for that set. The unpublished local package itself was intentionally excluded from the dependency-only audit.
-- Completed an adversarial repository-wide security review. Three candidates covering request resource exhaustion, CI action pinning, and configured-endpoint SSRF were tested and suppressed or found not applicable; no reportable security finding remains.
+- The initial review reported no findings. A later August 10 standard scan identified six findings, followed by remediation changes in PR #9. That scan describes its original revision; neither a green suite nor the earlier review establishes that the current tree has no remaining vulnerabilities.
 - Updated the package ownership, maintainer, support, vulnerability-reporting, and licensing-contact identity to Samsarix LLC while preserving the verified code-hosting URL.
 - Selected Apache License 2.0 for the public SDK and replaced the contradictory incomplete license files with the complete standard license text and SPDX package metadata.
 
-## Release-candidate verification
+## Historical release-candidate verification
 
 Executed with Python 3.11.9 on 2026-07-28:
 
@@ -162,17 +168,39 @@ Executed with Python 3.11.9 on 2026-07-28:
 | Clean virtual-environment wheel install and import | Passed: `0.1.0 UnifiedLLM`. |
 | Resolved runtime dependency audit | Passed: no known vulnerabilities found. |
 
-The engineering disposition is **release candidate with named external gates**, not production-ready. Local acceptance criteria are met; package publication remains blocked on the owner-controlled live-provider and publication steps below.
+## Current verification and evidence gaps
+
+Re-run on 2026-08-31 using Python 3.11.9 against `73f932e`:
+
+| Command or evidence | Result |
+| --- | --- |
+| `python -m pytest -q --cov=unified_llm --cov-report=term-missing` | 135 passed, 94.69% coverage. |
+| `python -m ruff check .` | Passed. |
+| `python -m ruff format --check .` | Passed, 29 files. |
+| `python -m mypy unified_llm tests examples` | Passed, 17 source files. |
+| PR #9 merged revision | `73f932e5c4499df5ba2e1f73175f2953910d00a6`. |
+| [Release dry run 31425066883](https://github.com/Deathcharge/unified-llm/actions/runs/31425066883) | Historical August 10 run rechecked: success on that revision; publication skipped. |
+
+These results prove the tested local contracts, not real-provider compatibility or independent adoption. The manual run skipped tag-specific gates; its success does not exercise rejection of an off-main tag. Current wheel smoke tests prove installation/import on Python 3.10–3.13, not the complete consumer journey from an installed artifact.
+
+Next locally actionable work, ordered by release value:
+
+1. Exercise the reference consumer through an installed wheel, outside the source checkout, using deterministic HTTP fixtures.
+2. Add targeted behavioral regressions for preprocessing admission and early multi-route size rejection; the current concurrency test covers provider I/O, not preprocessing explicitly.
+3. Verify tag-gate rejection with a local Git fixture and refresh dependency/security evidence before publication.
+
+The engineering disposition is **release candidate with named external gates and remaining verification work**, not production-ready.
 
 ## Deferred work and rationale
 
-- Streaming, telemetry, and pricing remain P2 extensions. The OpenAI Responses adapter was added only after the core route/failure and resource-bound semantics were proven, and it reuses those contracts rather than creating a parallel router.
+- Streaming and pricing remain P2 extensions. Content-free attempt observation is implemented; hosted telemetry collection remains outside the SDK. The Responses adapter reuses the router and transport contracts.
 - A hosted proxy, UI, authentication, persistence, and billing are out of scope because they duplicate mature products and are unsupported by repository evidence.
 
 ## Owner-, credential-, legal-, or production-blocked tasks
 
 - Live provider validation requires an owner-supplied endpoint, model, API key, and authorization to incur usage. Automated tests will use deterministic mocks instead.
 - Publishing to PyPI, creating signing identities, configuring trusted publishing, and creating a GitHub release require owner authorization.
+- Independent adoption is not established by the repository reference consumer. An adopter must choose an application and confirm its integration; do not modify the flagship repository to manufacture adoption evidence.
 
 ## Known risks
 
