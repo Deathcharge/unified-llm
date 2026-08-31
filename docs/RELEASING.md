@@ -4,11 +4,13 @@ No package has been published from this repository yet. This process makes relea
 
 ## Verified prerequisite status (2026-08-31)
 
-Read-only GitHub API checks found only the `github-pages` environment: the required `pypi` environment does not exist. The branch-protection endpoint reported that protection is disabled for `main`, and the repository ruleset list was empty. These are missing controls, not completed release setup.
+After owner authorization, the `pypi` environment was configured with `Deathcharge` as required reviewer, administrator bypass disabled, and a tag-only `v*` deployment policy. Self-review is allowed so the single maintainer can approve a release they initiated; this is a manual gate, not independent two-person approval.
 
-Do not push a release tag until the owner completes and verifies the setup below. Merely naming `environment: pypi` in the workflow does not establish required reviewers. The successful manual build/attestation dry run did not exercise publication or environment approval. PyPI publisher ownership/configuration has not been verified.
+Active repository rulesets now require pull requests and all nine CI/package/installed-wheel checks on up-to-date main candidates, require resolved review conversations, and prohibit main deletion or force-push. No bypass actors are configured. PR approvals are not mandatory (zero required approvals) for the single-maintainer workflow. A second active ruleset prohibits updates and deletion of `v*` release tags. The legacy branch-protection endpoint remains unavailable; the authoritative controls are repository rulesets `21950150` and `21950151`.
 
-Recheck with `gh api repos/Deathcharge/unified-llm/environments`, `gh api repos/Deathcharge/unified-llm/branches/main/protection`, and `gh api repos/Deathcharge/unified-llm/rulesets` before release; this dated observation is not a continuing guarantee.
+Do not push a release tag until the remaining setup and live-conformance gates below are verified. The successful manual build/attestation dry run did not exercise publication or environment approval. PyPI publisher ownership/configuration has not been verified; nothing has been published during this setup.
+
+Recheck with `gh api repos/Deathcharge/unified-llm/environments/pypi`, `gh api repos/Deathcharge/unified-llm/environments/pypi/deployment-branch-policies`, `gh api repos/Deathcharge/unified-llm/rules/branches/main`, and `gh api repos/Deathcharge/unified-llm/rulesets` before release; this dated observation is not a continuing guarantee.
 
 ## One-time owner setup
 

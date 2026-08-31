@@ -200,7 +200,7 @@ The engineering disposition is **release candidate with named external gates and
 
 ## Owner-, credential-, legal-, or production-blocked tasks
 
-- August 31 read-only GitHub checks confirmed that `pypi` environment setup is absent, `main` branch protection is disabled, and the repository has no rulesets. The owner must authorize protection changes and choose required release reviewers. Until then, manual publication approval is not enforced by the workflow's environment name. See `docs/RELEASING.md` for exact recheck commands.
+- Following August 31 owner authorization, `pypi` requires manual approval by `Deathcharge` and permits only `v*` tags, with administrator bypass disabled. Active rulesets require PRs and nine CI checks for main and prohibit main force-push/deletion and release-tag modification/deletion. Self-approval is allowed and PR approval count is zero for the single-maintainer workflow. See `docs/RELEASING.md` for exact controls and recheck commands. PyPI publisher setup and live endpoint evidence remain outstanding.
 
 - Live provider validation requires an owner-supplied endpoint, model, API key, and authorization to incur usage. Automated tests will use deterministic mocks instead.
 - Publishing to PyPI, creating signing identities, configuring trusted publishing, and creating a GitHub release require owner authorization.
