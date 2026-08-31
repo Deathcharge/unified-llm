@@ -185,8 +185,9 @@ These results prove the tested local contracts, not real-provider compatibility 
 
 Next locally actionable work, ordered by release value:
 
-1. Add targeted behavioral regressions for preprocessing admission and early multi-route size rejection; the current concurrency test covers provider I/O, not preprocessing explicitly.
-2. Verify tag-gate rejection with a local Git fixture and refresh dependency/security evidence before publication.
+1. Verify tag-gate rejection with a local Git fixture and refresh dependency/security evidence before publication.
+
+Preprocessing now has direct regression coverage in `tests/test_router.py`: a waiting request cannot enter validation before admission, cancelling a waiter never validates or consumes capacity, and an oversized first route prevents construction of later payloads. Both cancellation and validation rejection are followed by successful requests through the same single-permit client. These checks establish those specific boundaries, not an aggregate memory ceiling for arbitrary nested input graphs.
 
 The engineering disposition is **release candidate with named external gates and remaining verification work**, not production-ready.
 
